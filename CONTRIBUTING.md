@@ -2,6 +2,52 @@
 
 This document is a guide to help you through the process of contributing to `grafanactl`.
 
+## Issue Tracking
+
+This project uses [beads (`bd`)](https://github.com/steveyegge/beads) — a local-first, git-backed issue tracker. Issues live as JSONL files under `.beads/` and sync to a dedicated `beads-sync` branch on the remote.
+
+### Installing beads
+
+```console
+$ curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+```
+
+### First-time setup (after cloning)
+
+```console
+$ bd doctor                    # check health
+$ bd hooks install             # install git hooks
+$ bd migrate sync beads-sync   # configure the sync branch
+```
+
+### Working with issues
+
+```console
+$ bd ready                                              # list unblocked issues ready to work
+$ bd show grafanactl-experiments-<id>                   # view issue details
+$ bd update grafanactl-experiments-<id> --status=in_progress  # claim an issue
+$ bd list                                               # all open issues
+$ bd stats                                              # summary counts
+```
+
+### Creating issues
+
+```console
+$ bd create --title="Fix auth timeout" --type=bug --priority=2
+$ bd create --title="Add streaming support" --type=feature --priority=3
+```
+
+Priority scale: `0` (critical) → `4` (backlog). Types: `task`, `bug`, `feature`, `epic`.
+
+### Closing and syncing
+
+```console
+$ bd close grafanactl-experiments-<id>   # mark done
+$ bd sync                                # push issues to remote
+```
+
+Run `bd sync` before `git push` at the end of a session. Issue history is stored on the `beads-sync` orphan branch and does not appear in `main`'s commit history.
+
 ## Development environment
 
 `grafanactl` relies on [`devbox`](https://www.jetify.com/devbox/docs/) to manage all

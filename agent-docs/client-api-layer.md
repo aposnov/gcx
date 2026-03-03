@@ -1,0 +1,425 @@
+# Client and API Communication Layer
+
+## Overview
+
+grafanactl has two distinct client paths to Grafana. The primary path uses the
+Kubernetes dynamic client stack (k8s.io/client-go) to talk to Grafana's
+Kubernetes-compatible `/apis` endpoint for resource CRUD. A secondary path uses
+the Grafana OpenAPI generated client (`grafana-openapi-client-go`) for
+non-resource operations like health checks and stack discovery.
+
+---
+
+## Client Construction Chain
+
+```
+config.GrafanaConfig          (user-facing: server URL, auth, TLS, org/stack IDs)
+        |
+        v
+config.NewNamespacedRESTConfig()   [internal/config/rest.go]
+        |  - maps GrafanaConfig fields to k8s rest.Config
+        |  - resolves namespace (stacks-N or org-N) via DiscoverStackID
+        |  - sets QPS=50, Burst=100 rate limits
+        v
+config.NamespacedRESTConfig        (embeds rest.Config + Namespace string)
+        |
+        +---> dynamic.NewDefaultNamespacedClient()  [dynamic/namespaced_client.go]
+        |         |  calls dynamic.NewForConfig(&cfg.Config)
+        |         v
+        |     dynamic.NamespacedClient     (List, Get, GetMultiple, Create, Update, Delete, Apply)
+        |         ^
+        |         |  wrapped by
+        +---> dynamic.NewDefaultVersionedClient()   [dynamic/versioned_client.go]
+                  v
+              dynamic.VersionedClient     (same interface + auto-version re-fetch)
+```
+
+The secondary OpenAPI path is independent:
+
+```
+config.Context
+        |
+        v
+grafana.ClientFromContext()     [internal/grafana/client.go]
+        |  - parses server URL into Host/BasePath/Scheme
+        |  - applies auth (basic or API key)
+        v
+*goapi.GrafanaHTTPAPI           (generated OpenAPI client, /api base path)
+```
+
+---
+
+## Layer Descriptions
+
+### Layer 1: `config.GrafanaConfig` — User Configuration
+
+**File:** `internal/config/types.go`
+
+The root data structure that holds all user-provided connection settings:
+
+```go
+type GrafanaConfig struct {
+    Server   string  // env: GRAFANA_SERVER
+    User     string  // env: GRAFANA_USER
+    Password string  // env: GRAFANA_PASSWORD  (datapolicy:"secret")
+    APIToken string  // env: GRAFANA_TOKEN     (datapolicy:"secret")
+    OrgID    int64   // env: GRAFANA_ORG_ID    (on-prem)
+    StackID  int64   // env: GRAFANA_STACK_ID  (Grafana Cloud)
+    TLS      *TLS    // cert/key/ca data, insecure flag, SNI
+}
+```
+
+`datapolicy:"secret"` tags cause these fields to be redacted in logs. Auth
+priority: APIToken beats User/Password (enforced in `NewNamespacedRESTConfig`).
+
+### Layer 2: `NamespacedRESTConfig` — k8s REST Config Bridge
+
+**File:** `internal/config/rest.go` — `NewNamespacedRESTConfig()`
+
+Converts the user config into a `k8s.io/client-go/rest.Config` plus a resolved
+namespace string.
+
+**Key responsibilities:**
+
+1. **Host mapping** — `cfg.Grafana.Server` becomes `rest.Config.Host`; `APIPath`
+   is hardcoded to `"/apis"` (the K8s-compatible endpoint Grafana exposes).
+
+2. **Auth mapping:**
+   ```go
+   switch {
+   case cfg.Grafana.APIToken != "":
+       rcfg.BearerToken = cfg.Grafana.APIToken   // → Authorization: Bearer <token>
+   case cfg.Grafana.User != "":
+       rcfg.Username = cfg.Grafana.User
+       rcfg.Password = cfg.Grafana.Password       // → Authorization: Basic <b64>
+   }
+   ```
+
+3. **TLS mapping** — grafanactl's `TLS` struct is manually mapped to k8s's
+   `rest.TLSClientConfig` (they are incompatible types; `crypto/tls.Config` ≠
+   `rest.TLSClientConfig`).
+
+4. **Namespace resolution** — calls `DiscoverStackID()` to auto-detect Grafana
+   Cloud namespace. Falls back to configured OrgID or StackID:
+   ```
+   DiscoverStackID succeeds  →  stacks-<discoveredID>   (cloud, auto-detected)
+   DiscoverStackID fails
+     OrgID configured        →  org-<OrgID>             (on-prem)
+     StackID configured      →  stacks-<StackID>        (cloud, manual)
+   ```
+
+5. **Rate limits** — hardcoded `QPS: 50, Burst: 100` (TODO: make configurable).
+
+**Stack ID auto-discovery** (`internal/config/stack_id.go`):
+
+```
+GET {server}/bootdata
+→ { "settings": { "namespace": "stacks-98765" } }
+→ parse "stacks-98765" → StackID = 98765
+→ namespace = "stacks-98765"
+```
+
+Uses a dedicated 5-second-timeout HTTP client (separate from the main client).
+If the endpoint returns non-200 or an on-prem namespace (e.g., `"grafana"`),
+discovery fails and the configured values are used as-is.
+
+### Layer 3: `NamespacedClient` — Primary CRUD Client
+
+**File:** `internal/resources/dynamic/namespaced_client.go`
+
+Wraps `k8s.io/client-go/dynamic.Interface` with namespace-scoped operations.
+Every method scopes to `c.namespace` automatically:
+
+```go
+c.client.Resource(desc.GroupVersionResource()).Namespace(c.namespace).<op>()
+```
+
+**Operations provided:**
+
+| Method | Notes |
+|---|---|
+| `List` | Uses k8s pager for automatic pagination |
+| `Get` | Single resource by name |
+| `GetMultiple` | Concurrent Gets via `errgroup` (no SetLimit currently) |
+| `Create` | POST to resource endpoint |
+| `Update` | PUT to resource endpoint |
+| `Delete` | DELETE from resource endpoint |
+| `Apply` | Server-side apply (PATCH with field manager) |
+
+**Pagination pattern:**
+```go
+pager := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+    return c.client.Resource(desc.GroupVersionResource()).Namespace(c.namespace).List(ctx, opts)
+})
+pager.EachListItemWithAlloc(ctx, opts, func(obj runtime.Object) error { ... })
+```
+
+All errors pass through `ParseStatusError()` before being returned (see Error
+Translation below).
+
+**Constructor:**
+```go
+// From a NamespacedRESTConfig (typical usage):
+client, err := dynamic.NewDefaultNamespacedClient(cfg)
+
+// Or inject a pre-built dynamic.Interface (e.g., for tests):
+client := dynamic.NewNamespacedClient(namespace, myDynamicClient)
+```
+
+### Layer 4: `VersionedClient` — Version-Aware Client
+
+**File:** `internal/resources/dynamic/versioned_client.go`
+
+Embeds `*NamespacedClient` and adds automatic version re-fetching. Grafana
+resources can carry a `status.conversion.storedVersion` field indicating the
+actual stored API version differs from the requested version. When that field is
+present, `VersionedClient` re-fetches the resource using the stored version.
+
+**Flow for a List operation:**
+```
+1. Call NamespacedClient.List(ctx, desc, opts)      → initial list in requested version
+2. For each item, check status.conversion.storedVersion
+3. Items without storedVersion → kept as-is
+4. Items with storedVersion X  → grouped by new Descriptor{version=X}
+5. Call NamespacedClient.GetMultiple for each group  → re-fetch at correct version
+6. Return merged list
+```
+
+Only `List`, `Get`, and `GetMultiple` are overridden. `Create`, `Update`,
+`Delete`, `Apply` are inherited from `NamespacedClient` unchanged.
+
+**When to use which client:**
+
+| Client | Use case |
+|---|---|
+| `NamespacedClient` | Push operations (Create/Update/Delete/Apply) where version is known |
+| `VersionedClient` | Pull operations (List/Get) where stored version may differ |
+
+This maps directly to usage in `remote`:
+- `Pusher.NewDefaultPusher()` creates a `NamespacedClient`
+- `Puller.NewDefaultPuller()` creates a `VersionedClient`
+
+---
+
+## Error Translation
+
+**File:** `internal/resources/dynamic/errors.go`
+
+The k8s dynamic client returns `apierrors.StatusError` which has poor default
+formatting (message can be just `"unknown"`). `ParseStatusError` wraps all
+errors into `APIError` which formats as `"<code> <reason>: <message>"`:
+
+```go
+func ParseStatusError(err error) error {
+    if err == nil {
+        return nil
+    }
+    if status, ok := err.(apierrors.APIStatus); ok || errors.As(err, &status) {
+        return APIError{status.Status()}
+    }
+    // Non-API errors become a synthetic 500 Unknown
+    return APIError{
+        status: metav1.Status{
+            Status:  metav1.StatusFailure,
+            Reason:  metav1.StatusReasonUnknown,
+            Code:    http.StatusInternalServerError,
+            Message: err.Error(),
+        },
+    }
+}
+
+func (e APIError) Error() string {
+    return fmt.Sprintf("%d %s: %s", e.status.Code, e.status.Reason, e.status.Message)
+}
+```
+
+`APIError` also satisfies `apierrors.APIStatus`, so callers using
+`apierrors.IsNotFound(err)` and similar predicates continue to work.
+
+**Error flow:**
+```
+k8s dynamic client  →  apierrors.StatusError
+                              |
+                    ParseStatusError()
+                              |
+                         APIError
+                    "404 NotFound: dashboards.dashboard.grafana.app \"my-dash\" not found"
+```
+
+---
+
+## Grafana OpenAPI Client (Secondary Path)
+
+**File:** `internal/grafana/client.go`
+
+The `grafana-openapi-client-go` generated client targets `/api` (not `/apis`)
+and is used for Grafana-specific operations that are not part of the K8s API:
+
+```go
+func ClientFromContext(ctx *config.Context) (*goapi.GrafanaHTTPAPI, error) {
+    cfg := &goapi.TransportConfig{
+        Host:     grafanaURL.Host,
+        BasePath: grafanaURL.Path + "/api",
+        Schemes:  []string{grafanaURL.Scheme},
+    }
+    // Auth applied directly to TransportConfig (not rest.Config)
+    if ctx.Grafana.User != "" && ctx.Grafana.Password != "" {
+        cfg.BasicAuth = url.UserPassword(ctx.Grafana.User, ctx.Grafana.Password)
+    }
+    if ctx.Grafana.APIToken != "" {
+        cfg.APIKey = ctx.Grafana.APIToken
+    }
+    return goapi.NewHTTPClientWithConfig(strfmt.Default, cfg), nil
+}
+```
+
+**Current usages:**
+- `grafana.GetVersion()` — calls `GET /api/health` to check Grafana version
+- Version compatibility checks before operations
+
+**Does NOT use:**
+- `internal/httputils` (the OpenAPI client manages its own transport)
+- `NamespacedRESTConfig` (completely separate connection setup)
+
+---
+
+## HTTP Utilities (`internal/httputils`)
+
+These utilities are used by the **local development server** (`internal/server`),
+not by the dynamic client path.
+
+### `client.go` — Transport Factory
+
+```go
+func NewTransport(gCtx *config.Context) *http.Transport  // TLS-aware transport
+func NewHTTPClient(gCtx *config.Context) (*http.Client, error)
+```
+
+`NewHTTPClient` wraps the transport in `LoggedHTTPRoundTripper` and applies a
+10-second request timeout. Used by the serve command's reverse proxy.
+
+### `logger.go` — Logging Round-Tripper
+
+```go
+type LoggedHTTPRoundTripper struct {
+    DecoratedTransport http.RoundTripper
+}
+```
+
+Dumps full request/response bytes to debug log via `httputil.DumpRequest` /
+`httputil.DumpResponse`. Applied as the outermost transport layer in
+`NewHTTPClient`. This logging is context-aware (uses `logging.FromContext`).
+
+### `response.go` — Server Response Helpers
+
+```go
+func Error(r, w, msg, err, code)   // logs warning + writes HTTP error response
+func Write(r, w, content)          // writes bytes, logs on error
+func WriteJSON(r, w, content)      // JSON-marshals and writes with Content-Type header
+```
+
+Used by server-side HTTP handlers in `internal/server/handlers/`.
+
+### `constants.go`
+
+```go
+const UserAgent = "grafanactl"
+```
+
+Defined but not yet applied to the dynamic client (TODO in `rest.go:21`).
+
+---
+
+## Authentication Flow Summary
+
+```
+GrafanaConfig.APIToken != ""
+    │
+    ├─ dynamic path  →  rest.Config.BearerToken
+    │                   k8s transport sets "Authorization: Bearer <token>"
+    │
+    └─ OpenAPI path  →  TransportConfig.APIKey
+                        generated client sets "Authorization: Bearer <token>"
+
+GrafanaConfig.User != ""
+    │
+    ├─ dynamic path  →  rest.Config.Username + Password
+    │                   k8s transport sets "Authorization: Basic <b64(user:pass)>"
+    │
+    └─ OpenAPI path  →  TransportConfig.BasicAuth
+                        generated client sets "Authorization: Basic <b64(user:pass)>"
+```
+
+Priority: API token always wins over basic auth (enforced by `switch` statement
+in `NewNamespacedRESTConfig` and by separate `if` guards in `ClientFromContext`).
+
+---
+
+## Rate Limiting and Concurrency
+
+**Per-client rate limits** (dynamic client path only):
+- `rest.Config.QPS = 50` — sustained requests per second
+- `rest.Config.Burst = 100` — burst capacity above QPS
+- Enforced by k8s client-go's token bucket rate limiter inside the HTTP transport
+- Hardcoded; not currently exposed via config or CLI flags
+
+**Application-level concurrency** (in `NamespacedClient.GetMultiple`):
+```go
+g, ctx := errgroup.WithContext(ctx)
+for i, name := range names {
+    g.Go(func() error { ... c.Get(ctx, desc, name, opts) ... })
+}
+```
+No `SetLimit` call — all Gets run fully concurrent (bounded only by QPS/Burst).
+A TODO comment notes this should be capped.
+
+**Push concurrency** is managed one level up in `remote.Pusher`, which does use
+`errgroup.SetLimit(maxConcurrent)` with a configurable value passed from the CLI.
+
+---
+
+## How to Add a New API Operation
+
+To add a new operation to the dynamic client path (e.g., `Patch`):
+
+1. Add the method to `NamespacedClient` in `namespaced_client.go`:
+   ```go
+   func (c *NamespacedClient) Patch(
+       ctx context.Context, desc resources.Descriptor, name string,
+       pt types.PatchType, data []byte, opts metav1.PatchOptions,
+   ) (*unstructured.Unstructured, error) {
+       res, err := c.client.Resource(desc.GroupVersionResource()).
+           Namespace(c.namespace).Patch(ctx, name, pt, data, opts)
+       return res, ParseStatusError(err)
+   }
+   ```
+
+2. If the operation needs version awareness, override it in `VersionedClient`
+   in `versioned_client.go`. If not, it is inherited automatically.
+
+3. Add the method to the appropriate interface in `remote/puller.go` or
+   `remote/pusher.go` (`PullClient` / `PushClient`) if the operation is needed
+   from a Puller/Pusher.
+
+4. No changes needed to auth, TLS, or namespace handling — those are all
+   handled transparently by the `rest.Config` passed to `dynamic.NewForConfig`.
+
+---
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `internal/config/types.go` | `GrafanaConfig`, `TLS`, `Context` data structures |
+| `internal/config/rest.go` | `NewNamespacedRESTConfig()` — converts config to k8s REST config |
+| `internal/config/stack_id.go` | `DiscoverStackID()` — auto-detect Grafana Cloud namespace |
+| `internal/resources/dynamic/namespaced_client.go` | Primary CRUD client wrapping k8s dynamic.Interface |
+| `internal/resources/dynamic/versioned_client.go` | Version-aware client for pull operations |
+| `internal/resources/dynamic/errors.go` | `ParseStatusError()` / `APIError` — error translation |
+| `internal/grafana/client.go` | OpenAPI client factory for /api operations |
+| `internal/httputils/client.go` | HTTP transport factory (used by serve command) |
+| `internal/httputils/logger.go` | Debug-logging round-tripper |
+| `internal/httputils/response.go` | HTTP response helpers for server handlers |
+| `internal/resources/remote/remote.go` | `Processor` interface definition |
+| `internal/resources/remote/puller.go` | `PullClient` interface, `Puller` using `VersionedClient` |
+| `internal/resources/remote/pusher.go` | `PushClient` interface, `Pusher` using `NamespacedClient` |
