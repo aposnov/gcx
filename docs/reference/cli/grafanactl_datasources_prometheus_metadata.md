@@ -1,0 +1,48 @@
+## grafanactl datasources prometheus metadata
+
+Get metric metadata
+
+### Synopsis
+
+Get metadata (type, help text) for metrics from a Prometheus datasource.
+
+```
+grafanactl datasources prometheus metadata [flags]
+```
+
+### Examples
+
+```
+
+	# Get all metric metadata (use datasource UID, not name)
+	grafanactl datasources prometheus metadata -d <datasource-uid>
+
+	# Get metadata for a specific metric
+	grafanactl datasources prometheus metadata -d <datasource-uid> --metric http_requests_total
+
+	# Output as JSON
+	grafanactl datasources prometheus metadata -d <datasource-uid> -o json
+```
+
+### Options
+
+```
+  -d, --datasource string   Datasource UID (required unless default-prometheus-datasource is configured)
+  -h, --help                help for metadata
+  -m, --metric string       Filter by metric name
+  -o, --output string       Output format. One of: json, table, yaml (default "table")
+```
+
+### Options inherited from parent commands
+
+```
+      --config string    Path to the configuration file to use
+      --context string   Name of the context to use
+      --no-color         Disable color output
+  -v, --verbose count    Verbose mode. Multiple -v options increase the verbosity (maximum: 3).
+```
+
+### SEE ALSO
+
+* [grafanactl datasources prometheus](grafanactl_datasources_prometheus.md)	 - Prometheus datasource operations
+

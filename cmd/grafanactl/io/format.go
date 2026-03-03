@@ -48,6 +48,7 @@ func (opts *Options) Validate() error {
 	return nil
 }
 
+// Codec returns the codec for the configured output format.
 // We have to return an interface here.
 func (opts *Options) Codec() (format.Codec, error) { //nolint:ireturn
 	codec := opts.codecFor(opts.OutputFormat)

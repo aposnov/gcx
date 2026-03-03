@@ -54,6 +54,12 @@ type Context struct {
 
 	Grafana *GrafanaConfig `json:"grafana,omitempty" yaml:"grafana,omitempty"`
 
+	// DefaultPrometheusDatasource is the UID of the default Prometheus datasource to use for queries.
+	DefaultPrometheusDatasource string `json:"default-prometheus-datasource,omitempty" yaml:"default-prometheus-datasource,omitempty"`
+
+	// DefaultLokiDatasource is the UID of the default Loki datasource to use for queries.
+	DefaultLokiDatasource string `json:"default-loki-datasource,omitempty" yaml:"default-loki-datasource,omitempty"`
+
 	// Providers holds per-provider configuration, indexed by provider name.
 	// Each provider has a map of string key-value pairs.
 	// Secret fields are selectively redacted by providers.RedactSecrets using

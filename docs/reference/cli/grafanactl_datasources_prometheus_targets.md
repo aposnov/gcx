@@ -1,0 +1,51 @@
+## grafanactl datasources prometheus targets
+
+List scrape targets
+
+### Synopsis
+
+List scrape targets from a Prometheus datasource.
+
+```
+grafanactl datasources prometheus targets [flags]
+```
+
+### Examples
+
+```
+
+	# List active targets (use datasource UID, not name)
+	grafanactl datasources prometheus targets -d <datasource-uid>
+
+	# List dropped targets
+	grafanactl datasources prometheus targets -d <datasource-uid> --state dropped
+
+	# List all targets
+	grafanactl datasources prometheus targets -d <datasource-uid> --state any
+
+	# Output as JSON
+	grafanactl datasources prometheus targets -d <datasource-uid> -o json
+```
+
+### Options
+
+```
+  -d, --datasource string   Datasource UID (required unless default-prometheus-datasource is configured)
+  -h, --help                help for targets
+  -o, --output string       Output format. One of: json, table, yaml (default "table")
+      --state string        Filter by target state: active, dropped, any (default: active)
+```
+
+### Options inherited from parent commands
+
+```
+      --config string    Path to the configuration file to use
+      --context string   Name of the context to use
+      --no-color         Disable color output
+  -v, --verbose count    Verbose mode. Multiple -v options increase the verbosity (maximum: 3).
+```
+
+### SEE ALSO
+
+* [grafanactl datasources prometheus](grafanactl_datasources_prometheus.md)	 - Prometheus datasource operations
+

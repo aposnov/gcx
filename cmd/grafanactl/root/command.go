@@ -9,7 +9,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/grafana/grafanactl/cmd/grafanactl/config"
+	"github.com/grafana/grafanactl/cmd/grafanactl/datasources"
 	cmdproviders "github.com/grafana/grafanactl/cmd/grafanactl/providers"
+	"github.com/grafana/grafanactl/cmd/grafanactl/query"
 	"github.com/grafana/grafanactl/cmd/grafanactl/resources"
 	"github.com/grafana/grafanactl/internal/logs"
 	"github.com/grafana/grafanactl/internal/providers"
@@ -69,6 +71,8 @@ func newCommand(version string, pp []providers.Provider) *cobra.Command {
 	rootCmd.SetIn(os.Stdin)
 
 	rootCmd.AddCommand(config.Command())
+	rootCmd.AddCommand(datasources.Command())
+	rootCmd.AddCommand(query.Command())
 	rootCmd.AddCommand(resources.Command())
 
 	rootCmd.AddCommand(cmdproviders.Command(pp))

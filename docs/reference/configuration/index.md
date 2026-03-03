@@ -68,6 +68,10 @@ contexts:
           - string
           - ...
           
+    # DefaultPrometheusDatasource is the UID of the default Prometheus datasource to use for queries.
+    default-prometheus-datasource: string
+    # DefaultLokiDatasource is the UID of the default Loki datasource to use for queries.
+    default-loki-datasource: string
     # Providers holds per-provider configuration, indexed by provider name.
     # Each provider has a map of string key-value pairs.
     # Secret fields are selectively redacted by providers.RedactSecrets using
