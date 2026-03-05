@@ -182,6 +182,92 @@ via `p.Commands()...` — you do not need to touch `cmd/grafanactl/root/command.
 
 ---
 
+## Step 4a: Building PromQL Queries
+
+If your provider queries Prometheus datasources, use `github.com/grafana/promql-builder/go/promql`
+to construct PromQL expressions instead of `fmt.Sprintf`. This eliminates string
+injection risks and makes complex queries composable and readable.
+
+### Simple metric query
+
+```go
+import "github.com/grafana/promql-builder/go/promql"
+
+func buildMetricQuery(metricName, uuidRegex string) (string, error) {
+    expr, err := promql.Vector(metricName).
+        LabelMatchRegexp("grafana_slo_uuid", uuidRegex).
+        Build()
+    if err != nil {
+        return "", err
+    }
+    return expr.String(), nil
+}
+// Output: grafana_slo_sli_window{grafana_slo_uuid=~"uuid1|uuid2"}
+```
+
+### Complex computed query (burn rate example)
+
+```go
+func buildBurnRateQuery(uuidRegex string) (string, error) {
+    label := "grafana_slo_uuid"
+
+    successRate := promql.Sum(
+        promql.AvgOverTime(
+            promql.Vector("grafana_slo_success_rate_5m").
+                LabelMatchRegexp(label, uuidRegex).Range("1h"),
+        ),
+    ).By([]string{label})
+
+    totalRate := promql.Sum(
+        promql.AvgOverTime(
+            promql.Vector("grafana_slo_total_rate_5m").
+                LabelMatchRegexp(label, uuidRegex).Range("1h"),
+        ),
+    ).By([]string{label})
+
+    // burn_rate = (1 - clamp_max(success/total, 1)) / (1 - objective)
+    errorRate := promql.Sub(promql.N(1),
+        promql.ClampMax(promql.Div(successRate, totalRate), 1))
+    allowedError := promql.Sub(promql.N(1),
+        promql.Vector("grafana_slo_objective").
+            LabelMatchRegexp(label, uuidRegex))
+
+    burnRate := promql.Div(errorRate, allowedError).On([]string{label})
+
+    expr, err := burnRate.Build()
+    if err != nil {
+        return "", err
+    }
+    return expr.String(), nil
+}
+```
+
+### Batch-querying pattern
+
+Join multiple resource UUIDs with `|` and pass as a regex matcher via
+`.LabelMatchRegexp()`. Group results back to individual resources using
+`sum by (uuid_label)(...)`. This minimizes the number of Prometheus queries
+while returning per-resource values.
+
+```go
+uuids := []string{"abc123", "def456", "ghi789"}
+uuidRegex := strings.Join(uuids, "|")
+
+query, _ := buildMetricQuery("grafana_slo_sli_window", uuidRegex)
+// Result: grafana_slo_sli_window{grafana_slo_uuid=~"abc123|def456|ghi789"}
+```
+
+### Data fetching rule
+
+Always fetch all available metrics regardless of the `--output` format. The
+output format controls **display**, not **data acquisition**. Table codecs
+choose which columns to show; JSON/YAML codecs serialize the full struct. See
+Pattern 13 in `patterns.md`.
+
+Reference: `internal/slo/definitions/status.go`, `internal/query/prometheus/client.go`
+
+---
+
 ## Step 5: Register the Provider
 
 Open `internal/providers/registry.go` and add your provider to the returned slice:

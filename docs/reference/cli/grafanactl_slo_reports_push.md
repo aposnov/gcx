@@ -1,0 +1,28 @@
+## grafanactl slo reports push
+
+Push SLO reports from files.
+
+```
+grafanactl slo reports push FILE... [flags]
+```
+
+### Options
+
+```
+      --dry-run   Preview changes without making them
+  -h, --help      help for push
+```
+
+### Options inherited from parent commands
+
+```
+      --config string    Path to the configuration file to use
+      --context string   Name of the context to use
+      --no-color         Disable color output
+  -v, --verbose count    Verbose mode. Multiple -v options increase the verbosity (maximum: 3).
+```
+
+### SEE ALSO
+
+* [grafanactl slo reports](grafanactl_slo_reports.md)	 - Manage SLO reports.
+

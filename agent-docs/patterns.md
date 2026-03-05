@@ -264,6 +264,66 @@ terminal charts (`internal/graph`). The `query` command registers custom codecs
 
 ---
 
+### 13. Format-Agnostic Data Fetching (High Confidence: 95%)
+
+Commands fetch **all** available data in `RunE`, regardless of the `--output`
+format. The output format (`-o table`, `-o wide`, `-o json`, etc.) controls
+**display**, not **data acquisition**. Custom table codecs select which columns
+to render; the built-in JSON/YAML codecs serialize the full data structure.
+
+This separation ensures that JSON/YAML always contain complete data, and adding
+new table columns never requires changes to the fetch logic.
+
+**Anti-pattern:** Gating data fetches on `opts.IO.OutputFormat == "wide"` or
+similar sentinel checks. This causes JSON/YAML to silently omit fields that
+only the wide table codec was expected to display.
+
+**Implementation rule:**
+- `RunE` calls fetch functions with no format awareness
+- The result struct contains all fields (SLI, Budget, BurnRate, SLI1h, SLI1d…)
+- Table codecs choose which subset of fields to render
+- JSON/YAML codecs serialize the full struct via standard `encoding/json` tags
+
+**Evidence:**
+- `internal/slo/definitions/status.go`: `fetchMetrics` fetches all metrics unconditionally
+- `cmd/grafanactl/query/command.go`: query response passed to all codecs unchanged
+- `cmd/grafanactl/io/format.go`: built-in JSON/YAML codecs fall through when no custom codec is registered
+
+---
+
+### 14. PromQL Construction with promql-builder (High Confidence: 90%)
+
+PromQL expressions are built programmatically using `github.com/grafana/promql-builder/go/promql`
+rather than string formatting. This eliminates string injection risks and makes
+complex expressions (aggregations, binary operations, function calls) composable
+and readable.
+
+**Key API surface:**
+
+| Builder | Purpose | Example |
+|---------|---------|---------|
+| `promql.Vector(name)` | Metric selector | `promql.Vector("grafana_slo_sli_window")` |
+| `.LabelMatchRegexp(k, v)` | `=~` matcher | `.LabelMatchRegexp("grafana_slo_uuid", "uuid1\|uuid2")` |
+| `.Range("1h")` | Range vector | `.Range("1h")` → `metric[1h]` |
+| `promql.Sum(expr).By(labels)` | Aggregation | `promql.Sum(expr).By([]string{"grafana_slo_uuid"})` |
+| `promql.Div(a, b).On(labels)` | Binary with matching | Division with `on(label)` clause |
+| `promql.ClampMax(expr, max)` | Function call | `promql.ClampMax(expr, 1)` |
+| `promql.AvgOverTime(expr)` | Range function | Wraps a range vector |
+| `promql.N(value)` | Number literal | `promql.N(1)` → scalar `1` |
+| `.Build()` then `.String()` | Render to string | Final step to get PromQL text |
+
+**Batch-querying pattern:** Join multiple resource UUIDs with `|` and pass as a
+regex matcher via `.LabelMatchRegexp()`. Group results back to individual
+resources using `sum by (uuid_label)(...)`.
+
+Cross-reference: Pattern 12 (Direct HTTP Client for Datasource APIs).
+
+**Evidence:**
+- `internal/slo/definitions/status.go`: `buildBurnRateQuery`, `buildMetricQuery`
+- Dependency: `github.com/grafana/promql-builder/go` in `go.mod`
+
+---
+
 ## Contradiction Resolutions
 
 ### 1. DiscoverStackID Called Twice

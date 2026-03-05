@@ -1,0 +1,25 @@
+## grafanactl slo
+
+Manage Grafana SLO resources.
+
+### Options
+
+```
+      --config string    Path to the configuration file to use
+      --context string   Name of the context to use
+  -h, --help             help for slo
+```
+
+### Options inherited from parent commands
+
+```
+      --no-color        Disable color output
+  -v, --verbose count   Verbose mode. Multiple -v options increase the verbosity (maximum: 3).
+```
+
+### SEE ALSO
+
+* [grafanactl](grafanactl.md)	 - 
+* [grafanactl slo definitions](grafanactl_slo_definitions.md)	 - Manage SLO definitions.
+* [grafanactl slo reports](grafanactl_slo_reports.md)	 - Manage SLO reports.
+

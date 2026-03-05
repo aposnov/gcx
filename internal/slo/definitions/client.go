@@ -1,0 +1,184 @@
+package definitions
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/grafana/grafanactl/internal/config"
+	"k8s.io/client-go/rest"
+)
+
+// ErrNotFound is returned when a requested SLO does not exist (HTTP 404).
+var ErrNotFound = errors.New("SLO not found")
+
+const basePath = "/api/plugins/grafana-slo-app/resources/v1/slo"
+
+// Client is an HTTP client for the Grafana SLO API.
+type Client struct {
+	restConfig config.NamespacedRESTConfig
+	httpClient *http.Client
+}
+
+// NewClient creates a new SLO definitions client.
+func NewClient(cfg config.NamespacedRESTConfig) (*Client, error) {
+	httpClient, err := rest.HTTPClientFor(&cfg.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	return &Client{
+		restConfig: cfg,
+		httpClient: httpClient,
+	}, nil
+}
+
+// List returns all SLO definitions.
+func (c *Client) List(ctx context.Context) ([]Slo, error) {
+	resp, err := c.doRequest(ctx, http.MethodGet, basePath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list SLOs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, handleErrorResponse(resp)
+	}
+
+	var listResp SLOListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
+		return nil, fmt.Errorf("failed to decode SLO list response: %w", err)
+	}
+
+	if listResp.SLOs == nil {
+		return []Slo{}, nil
+	}
+
+	return listResp.SLOs, nil
+}
+
+// Get returns a single SLO definition by UUID.
+func (c *Client) Get(ctx context.Context, uuid string) (*Slo, error) {
+	resp, err := c.doRequest(ctx, http.MethodGet, basePath+"/"+uuid, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SLO %s: %w", uuid, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, handleErrorResponse(resp)
+	}
+
+	var slo Slo
+	if err := json.NewDecoder(resp.Body).Decode(&slo); err != nil {
+		return nil, fmt.Errorf("failed to decode SLO response: %w", err)
+	}
+
+	return &slo, nil
+}
+
+// Create creates a new SLO definition.
+func (c *Client) Create(ctx context.Context, slo *Slo) (*SLOCreateResponse, error) {
+	body, err := json.Marshal(slo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SLO: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, basePath, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SLO: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return nil, handleErrorResponse(resp)
+	}
+
+	var createResp SLOCreateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+		return nil, fmt.Errorf("failed to decode SLO create response: %w", err)
+	}
+
+	return &createResp, nil
+}
+
+// Update updates an existing SLO definition.
+func (c *Client) Update(ctx context.Context, uuid string, slo *Slo) error {
+	body, err := json.Marshal(slo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal SLO: %w", err)
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPut, basePath+"/"+uuid, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to update SLO %s: %w", uuid, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return handleErrorResponse(resp)
+	}
+
+	return nil
+}
+
+// Delete deletes an SLO definition by UUID.
+func (c *Client) Delete(ctx context.Context, uuid string) error {
+	resp, err := c.doRequest(ctx, http.MethodDelete, basePath+"/"+uuid, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete SLO %s: %w", uuid, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return handleErrorResponse(resp)
+	}
+
+	return nil
+}
+
+// doRequest builds and executes an HTTP request against the Grafana SLO API.
+func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.restConfig.Host+path, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	return resp, nil
+}
+
+// handleErrorResponse reads an error response body and returns a formatted error.
+func handleErrorResponse(resp *http.Response) error {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("request failed with status %d (could not read body: %w)", resp.StatusCode, err)
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != "" {
+		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, errResp.Error)
+	}
+
+	if len(body) > 0 {
+		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return fmt.Errorf("request failed with status %d", resp.StatusCode)
+}

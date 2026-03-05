@@ -29,7 +29,7 @@ func TestAll(t *testing.T) {
 		name string
 	}{
 		{
-			name: "returns empty slice when no providers are registered",
+			name: "returns empty slice when no providers are registered at the internal layer",
 		},
 	}
 

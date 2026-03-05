@@ -150,6 +150,8 @@ github.com/grafana/grafana/apps/folder v0.0.0-20250724095330-d852bde2a5fb h1:zSo
 github.com/grafana/grafana/apps/folder v0.0.0-20250724095330-d852bde2a5fb/go.mod h1:1toka8WTXd3CVHdgQRRcnwQWkBLGNaAqVXKShGVlDS0=
 github.com/grafana/grafana/pkg/apimachinery v0.0.0-20250903133002-4e28cba1c53a h1:+HkE1JQJUx6ocoZWZYGmX4JR7TsHcAXDJ/PK1Y3j53Q=
 github.com/grafana/grafana/pkg/apimachinery v0.0.0-20250903133002-4e28cba1c53a/go.mod h1:av5N0Naq+8VV9MLF7zAkihy/mVq5UbS2EvRSJukDHlY=
+github.com/grafana/promql-builder/go v0.0.0-20250916111012-8fa9625b89a3 h1:B5SncfJyapaCmCM/r5007X4hjkKTgQ1XaOpA5VgrboU=
+github.com/grafana/promql-builder/go v0.0.0-20250916111012-8fa9625b89a3/go.mod h1:TsO1alA6DmSpsS8xh4lAknLlY2wLl4q3B/HFMlZvXaE=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=

@@ -540,4 +540,5 @@ cmd.AddCommand(myCmd(configOpts))
 | All errors bubble up through `RunE` return value; never `os.Exit` in commands | All commands |
 | Status messages go to `cmd.OutOrStdout()`, not `os.Stdout` directly | All commands |
 | Custom table codecs implement `format.Codec` and are registered before `BindFlags` | `get.go`, `list.go`, `validate.go` |
+| Data fetching is format-agnostic — fetch all fields, let codecs filter display | All commands with custom codecs |
 | `OnErrorMode` is always validated in `opts.Validate()`, not inline | All multi-resource commands |

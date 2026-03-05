@@ -42,6 +42,13 @@ ioOpts.RegisterCustomCodec("text", myTableCodec)
 ioOpts.DefaultFormat("text")   // makes "text" the default instead of "json"
 ```
 
+**Data fetching is format-agnostic.** Commands must fetch all available data
+in `RunE` regardless of the `--output` value. The output format controls
+**presentation**, not **data acquisition**. Table/wide codecs select which
+columns to render; the built-in JSON/YAML codecs serialize the full data
+structure. Do not gate data fetches on `opts.IO.OutputFormat` — this causes
+JSON/YAML to silently omit fields. See Pattern 13 in `patterns.md`.
+
 ### 1.3 Default Format by Command Type `[ADOPT]`
 
 | Command type | Default format | Rationale |
@@ -380,6 +387,8 @@ UX requirements. All items are `[ADOPT]` unless marked otherwise.
 - [ ] Destructive operations document `--dry-run` support
 - [ ] Help text follows Section 8 standards (Short/Long/Examples)
 - [ ] Push-like operations are idempotent (create-or-update)
+- [ ] Data fetching is format-agnostic — do not gate fetches on `--output` value (Pattern 13)
+- [ ] PromQL queries use `promql-builder` (`github.com/grafana/promql-builder/go/promql`), not string formatting (Pattern 14)
 
 ### Build Verification `[CURRENT]`
 

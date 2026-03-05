@@ -20,6 +20,7 @@ type ChartOptions struct {
 	Height   int
 	Title    string
 	TextOnly bool
+	MaxValue *float64 // Optional max value for bar charts (e.g., 100 for percentages)
 }
 
 // DefaultChartOptions returns default chart options.
@@ -29,6 +30,90 @@ func DefaultChartOptions() ChartOptions {
 		Width:  width,
 		Height: min(height/2, 20),
 	}
+}
+
+// RenderPercentageBars renders labeled horizontal bars scaled 0–100%.
+// Each item gets a line: name, filled/unfilled bar, value, and optional target.
+func RenderPercentageBars(w io.Writer, title string, items []PercentageBarItem, opts ChartOptions) error {
+	if len(items) == 0 {
+		fmt.Fprintln(w, "No data to display")
+		return nil
+	}
+
+	if opts.TextOnly {
+		return renderPercentageBarsText(w, title, items)
+	}
+
+	var sb strings.Builder
+
+	if title != "" {
+		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF"))
+		sb.WriteString(titleStyle.Render(title))
+		sb.WriteString("\n\n")
+	}
+
+	// Find max label width for alignment.
+	maxLabelWidth := 0
+	for _, item := range items {
+		n := min(len(item.Name), 30)
+		if n > maxLabelWidth {
+			maxLabelWidth = n
+		}
+	}
+
+	// Compute available bar width.
+	// Layout: "  {label}  {bar}  {value}  target: {target}"
+	const rightWidth = 30 // enough for "  99.72%  target: 99.50%"
+	barWidth := min(80, max(20, opts.Width-maxLabelWidth-4-rightWidth))
+
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+
+	for i, item := range items {
+		name := item.Name
+		if len(name) > 30 {
+			name = name[:27] + "..."
+		}
+
+		fillRatio := item.Value / 100.0
+		fillRatio = max(0, min(1, fillRatio))
+		filled := int(float64(barWidth) * fillRatio)
+		empty := barWidth - filled
+
+		// Bar color: compliance status (green/yellow/orange/red).
+		barColor := ComplianceColor(item.Value, item.Target)
+		filledStr := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled))
+		emptyStr := dimStyle.Render(strings.Repeat("░", empty))
+
+		// Label color: series palette to distinguish items.
+		labelColor := ColorForIndex(i)
+		labelStr := lipgloss.NewStyle().Foreground(labelColor).Render(fmt.Sprintf("%-*s", maxLabelWidth, name))
+
+		valueStr := fmt.Sprintf("%.2f%%", item.Value)
+
+		targetStr := ""
+		if item.Target > 0 {
+			targetStr = fmt.Sprintf("  target: %.2f%%", item.Target)
+		}
+
+		sb.WriteString(fmt.Sprintf("  %s  %s%s  %s%s\n", labelStr, filledStr, emptyStr, valueStr, targetStr))
+	}
+
+	_, err := fmt.Fprint(w, sb.String())
+	return err
+}
+
+func renderPercentageBarsText(w io.Writer, title string, items []PercentageBarItem) error {
+	if title != "" {
+		fmt.Fprintf(w, "%s\n\n", title)
+	}
+	for _, item := range items {
+		targetStr := ""
+		if item.Target > 0 {
+			targetStr = fmt.Sprintf("  (target: %.2f%%)", item.Target)
+		}
+		fmt.Fprintf(w, "  %s: %.2f%%%s\n", item.Name, item.Value, targetStr)
+	}
+	return nil
 }
 
 // RenderChart auto-selects chart type based on data characteristics.
@@ -72,10 +157,23 @@ func RenderBarChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 		})
 	}
 
-	bc := barchart.New(opts.Width, opts.Height,
+	// Fixed bar sizing: 2 cells per bar, 1 cell gap, +2 for axis.
+	const barWidth = 2
+	const barGap = 1
+	chartHeight := min(opts.Height, len(barData)*(barWidth+barGap)+2)
+
+	chartOpts := []barchart.Option{
 		barchart.WithHorizontalBars(),
 		barchart.WithDataSet(barData),
-	)
+		barchart.WithNoAutoBarWidth(),
+		barchart.WithBarWidth(barWidth),
+		barchart.WithBarGap(barGap),
+	}
+	if opts.MaxValue != nil {
+		chartOpts = append(chartOpts, barchart.WithMaxValue(*opts.MaxValue))
+	}
+
+	bc := barchart.New(opts.Width, chartHeight, chartOpts...)
 
 	var sb strings.Builder
 
@@ -92,6 +190,13 @@ func RenderBarChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 	bc.Draw()
 	sb.WriteString(bc.View())
 	sb.WriteString("\n")
+
+	// Legend with values (bar chart doesn't show value labels on bars).
+	legend := renderBarLegend(data.Series)
+	if legend != "" {
+		sb.WriteString("\n")
+		sb.WriteString(legend)
+	}
 
 	_, err := fmt.Fprint(w, sb.String())
 	return err
@@ -136,6 +241,12 @@ func RenderLineChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 	// Convert first series to TimePoints
 	firstPoints := convertToTimePoints(data.Series[0].Points)
 
+	// Resolve color for first series: use explicit Color if set, else ColorForIndex.
+	firstColor := data.Series[0].Color
+	if firstColor == "" {
+		firstColor = ColorForIndex(0)
+	}
+
 	// Create chart options
 	chartOpts := []timeserieslinechart.Option{
 		timeserieslinechart.WithYRange(minY, maxY),
@@ -143,7 +254,7 @@ func RenderLineChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 		timeserieslinechart.WithAxesStyles(axisStyle, labelStyle),
 		timeserieslinechart.WithXLabelFormatter(localTimeFormatter),
 		timeserieslinechart.WithTimeSeries(firstPoints),
-		timeserieslinechart.WithStyle(lipgloss.NewStyle().Foreground(ColorForIndex(0))),
+		timeserieslinechart.WithStyle(lipgloss.NewStyle().Foreground(firstColor)),
 		timeserieslinechart.WithLineStyle(runes.ThinLineStyle),
 	}
 
@@ -153,7 +264,10 @@ func RenderLineChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 	// Add additional series
 	for i := 1; i < len(data.Series); i++ {
 		series := data.Series[i]
-		color := ColorForIndex(i)
+		color := series.Color
+		if color == "" {
+			color = ColorForIndex(i)
+		}
 		dataSetName := fmt.Sprintf("series%d", i)
 
 		points := convertToTimePoints(series.Points)
@@ -262,7 +376,11 @@ func renderLegend(series []Series) string {
 
 	var legendParts []string
 	for i, s := range series {
-		color := ColorForIndex(i)
+		// Use the series-specific Color if set; otherwise fall back to ColorForIndex.
+		color := s.Color
+		if color == "" {
+			color = ColorForIndex(i)
+		}
 		colorBox := lipgloss.NewStyle().Foreground(color).Render("●")
 		name := s.Name
 		if len(name) > 30 {
@@ -272,6 +390,28 @@ func renderLegend(series []Series) string {
 	}
 
 	// Join with spacing
+	return strings.Join(legendParts, "  ")
+}
+
+func renderBarLegend(series []Series) string {
+	if len(series) == 0 {
+		return ""
+	}
+
+	var legendParts []string
+	for i, s := range series {
+		if len(s.Points) == 0 {
+			continue
+		}
+		color := ColorForIndex(i)
+		colorBox := lipgloss.NewStyle().Foreground(color).Render("●")
+		name := s.Name
+		if len(name) > 30 {
+			name = name[:27] + "..."
+		}
+		legendParts = append(legendParts, fmt.Sprintf("%s %s: %.2f", colorBox, name, s.Points[0].Value))
+	}
+
 	return strings.Join(legendParts, "  ")
 }
 
