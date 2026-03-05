@@ -264,35 +264,28 @@ output format controls **display**, not **data acquisition**. Table codecs
 choose which columns to show; JSON/YAML codecs serialize the full struct. See
 Pattern 13 in `patterns.md`.
 
-Reference: `internal/slo/definitions/status.go`, `internal/query/prometheus/client.go`
+Reference: `internal/providers/slo/definitions/status.go`, `internal/query/prometheus/client.go`
 
 ---
 
 ## Step 5: Register the Provider
 
-Open `internal/providers/registry.go` and add your provider to the returned slice:
+Providers self-register using the `Register()` function in your provider's `init()` function.
+Add this to your provider package (typically in `internal/providers/{provider}/provider.go`):
 
 ```go
-// Before
-func All() []Provider {
-    return []Provider{}
-}
-
-// After
-import sloprovider "github.com/grafana/grafanactl/internal/providers/slo"
-
-func All() []Provider {
-    return []Provider{
-        &sloprovider.SLOProvider{},
-    }
+func init() {
+    providers.Register(&SLOProvider{})
 }
 ```
 
-This is the **only registration step** required. Once the provider is in `All()`:
+The `Register()` function appends your provider to the global registry automatically. Once registered via `init()`:
 - Its commands appear under `grafanactl`
 - Its name and description appear in `grafanactl providers`
 - Its secrets are correctly redacted by `grafanactl config view`
 - Its config is loaded from YAML and env vars automatically
+
+This self-registration pattern (via `init()`) is handled by Go's import system — just ensure your provider package is imported somewhere in the application startup (e.g., in `cmd/grafanactl/root/command.go`). Reference: `internal/providers/slo/provider.go` for the full implementation.
 
 ---
 

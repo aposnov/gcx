@@ -212,7 +212,7 @@ applies a secure-by-default model:
 - Everything else (undeclared keys, unknown providers, `Secret=true`) → redacted
 
 **Config storage:** Provider configs live in
-`Context.Grafana.Providers map[string]map[string]string`, indexed by provider
+`Context.Providers map[string]map[string]string`, indexed by provider
 name. Reflection-based editor picks them up via the `yaml:"providers"` tag.
 
 **Evidence:**
@@ -220,7 +220,7 @@ name. Reflection-based editor picks them up via the `yaml:"providers"` tag.
 - `internal/providers/registry.go`: `All()` function
 - `internal/providers/redact.go`: `RedactSecrets` implementation
 - `cmd/grafanactl/providers/command.go`: `providers list` command
-- `internal/config/types.go`: `Providers` field on `GrafanaConfig`
+- `internal/config/types.go`: `Providers` field on `Context`
 
 ---
 
@@ -285,7 +285,7 @@ only the wide table codec was expected to display.
 - JSON/YAML codecs serialize the full struct via standard `encoding/json` tags
 
 **Evidence:**
-- `internal/slo/definitions/status.go`: `fetchMetrics` fetches all metrics unconditionally
+- `internal/providers/slo/definitions/status.go`: `fetchMetrics` fetches all metrics unconditionally
 - `cmd/grafanactl/query/command.go`: query response passed to all codecs unchanged
 - `cmd/grafanactl/io/format.go`: built-in JSON/YAML codecs fall through when no custom codec is registered
 
@@ -319,7 +319,7 @@ resources using `sum by (uuid_label)(...)`.
 Cross-reference: Pattern 12 (Direct HTTP Client for Datasource APIs).
 
 **Evidence:**
-- `internal/slo/definitions/status.go`: `buildBurnRateQuery`, `buildMetricQuery`
+- `internal/providers/slo/definitions/status.go`: `buildBurnRateQuery`, `buildMetricQuery`
 - Dependency: `github.com/grafana/promql-builder/go` in `go.mod`
 
 ---

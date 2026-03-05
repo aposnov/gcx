@@ -9,15 +9,17 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/providers"
-	"github.com/grafana/grafanactl/internal/slo/definitions"
-	"github.com/grafana/grafanactl/internal/slo/reports"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
+	"github.com/grafana/grafanactl/internal/providers/slo/reports"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
+func init() { //nolint:gochecknoinits // Self-registration pattern (like database/sql drivers).
+	providers.Register(&SLOProvider{})
+}
+
 // SLOProvider manages Grafana SLO resources.
-// It implements providers.Provider via structural (duck) typing — the registry
-// verifies this at compile time without creating an import cycle.
 type SLOProvider struct{}
 
 // Name returns the unique identifier for this provider.

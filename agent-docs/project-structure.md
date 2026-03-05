@@ -11,6 +11,7 @@ grafanactl/
 │       ├── config/           # 'config' subcommand implementations
 │       ├── resources/        # 'resources' subcommand implementations
 │       ├── datasources/      # 'datasources' subcommand implementations
+│       ├── dev/              # 'dev' subcommand (import, scaffold)
 │       ├── query/            # 'query' subcommand implementation
 │       ├── providers/        # 'providers' subcommand implementation
 │       ├── fail/             # Error → DetailedError conversion, exit codes
@@ -29,6 +30,9 @@ grafanactl/
 │   │   ├── prometheus/       # Prometheus HTTP client (instant + range queries)
 │   │   └── loki/             # Loki HTTP client (log + metric queries)
 │   ├── secrets/              # Redaction of sensitive config fields
+│   ├── slo/                  # SLO provider implementation
+│   │   ├── definitions/      # SLO definitions and status queries
+│   │   └── reports/          # SLO reports
 │   ├── testutils/            # Shared test helpers (not exposed externally)
 │   ├── resources/            # Core resource abstraction layer
 │   │   ├── discovery/        # API discovery: registry, index, preferred versions

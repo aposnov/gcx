@@ -25,21 +25,11 @@ func (m *mockProvider) Validate(cfg map[string]string) error { return m.validate
 func (m *mockProvider) ConfigKeys() []providers.ConfigKey    { return m.configKeys }
 
 func TestAll(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-		{
-			name: "returns empty slice when no providers are registered at the internal layer",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := providers.All()
-			require.NotNil(t, got)
-			require.Empty(t, got)
-		})
-	}
+	t.Run("returns empty slice when no providers are registered at the internal layer", func(t *testing.T) {
+		got := providers.All()
+		require.NotNil(t, got)
+		require.Empty(t, got)
+	})
 }
 
 func TestMockProviderSatisfiesInterface(t *testing.T) {

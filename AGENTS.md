@@ -88,7 +88,8 @@ internal/
 │   ├── local/      FSReader, FSWriter (disk I/O)
 │   ├── process/    Processors: ManagerFields, ServerFields, Namespace
 │   └── remote/     Pusher, Puller, Deleter, FolderHierarchy, Summary
-├── providers/   Provider plugin system (Prometheus, Loki config + registry)
+├── providers/   Provider plugin system (interface, registry, self-registration)
+│   └── slo/        SLO provider (definitions, reports, status, timeline)
 ├── query/       Datasource query clients
 │   ├── prometheus/  Prometheus HTTP query client
 │   └── loki/        Loki HTTP query client

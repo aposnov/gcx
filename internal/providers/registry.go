@@ -1,11 +1,19 @@
 package providers
 
-// All returns all compile-time registered providers.
-// When new providers are implemented, they should be added to the
-// returned slice.
-//
-// Note: provider registration is done at the cmd layer to avoid import cycles.
-// See cmd/grafanactl/root/command.go for the full provider list.
+// registry holds all providers registered via Register().
+var registry []Provider //nolint:gochecknoglobals // Self-registration pattern requires package-level state.
+
+// Register adds a provider to the global registry.
+// Providers call this from their init() function.
+func Register(p Provider) {
+	registry = append(registry, p)
+}
+
+// All returns all registered providers.
+// Returns a non-nil empty slice when no providers have been registered.
 func All() []Provider {
-	return []Provider{}
+	if registry == nil {
+		return []Provider{}
+	}
+	return registry
 }

@@ -55,11 +55,105 @@ grafanactl (root)
 │   ├── --step               Query step (e.g. 15s, 1m)
 │   └── --output / -o        table|json|yaml|graph  [default: table]
 │
-└── providers                [cmd/grafanactl/providers/command.go]
-    └── (list; no subcommands — prints NAME/DESCRIPTION table of registered providers)
+├── providers                [cmd/grafanactl/providers/command.go]
+│   └── (list; no subcommands — prints NAME/DESCRIPTION table of registered providers)
+│
+└── dev                      [cmd/grafanactl/dev/command.go]
+    ├── import               Import existing Grafana resources as code
+    └── scaffold             Scaffold a new grafanactl-based project
 ```
 
 Key: SELECTOR = `kind[/name[,name...]]` or long form `kind.group/name`
+
+---
+
+## Provider Command Groups
+
+Providers contribute top-level command groups to grafanactl. Unlike `resources`
+subcommands (which use the dynamic K8s client), provider commands wrap
+product-specific REST APIs and translate to/from the K8s envelope format.
+
+### When to use a provider vs `resources`
+
+```
+Does the product expose a K8s-compatible API via /apis endpoint?
+├── YES → Use `grafanactl resources` (no provider needed)
+└── NO  → Create a provider (wraps product's REST API)
+```
+
+See `.claude/skills/add-provider/references/decision-tree.md` for the full
+decision tree.
+
+### Provider command structure
+
+Provider commands follow a consistent pattern: a top-level group command with
+resource-type subcommands underneath. Each resource type gets standard CRUD
+operations plus optional product-specific commands.
+
+```
+grafanactl {provider}           [contributed by Provider.Commands()]
+├── --config                    [persistent: inherited via configLoader]
+├── --context                   [persistent: inherited via configLoader]
+│
+├── {resource-type}             [one group per resource type]
+│   ├── list                    [always: list all resources]
+│   ├── get    <id>             [always: get single resource]
+│   ├── push   [path...]        [always: create-or-update from local files]
+│   ├── pull                    [always: export to local files]
+│   ├── delete <id...>          [always: delete resources]
+│   └── status [id]             [optional: operational health data]
+│
+└── {other-resource-type}       [if product has multiple resource types]
+    └── (same CRUD pattern)
+```
+
+### Current providers
+
+```
+grafanactl slo                  [internal/providers/slo/provider.go]
+├── definitions                 CRUD + status/timeline for SLO definitions
+│   ├── list
+│   ├── get    <uuid>
+│   ├── push   [path...]
+│   ├── pull
+│   ├── delete <uuid...>
+│   └── status [uuid]
+└── reports                     CRUD + status for SLO reports
+    ├── list
+    ├── get    <uuid>
+    ├── push   [path...]
+    ├── pull
+    ├── delete <uuid...>
+    └── status [uuid]
+```
+
+### Config loading pattern
+
+Provider commands cannot import `cmd/grafanactl/config` (import cycle). Instead,
+they use a lightweight `configLoader` that binds `--config` and `--context` flags
+independently. See `internal/providers/slo/provider.go` for the reference implementation.
+
+```go
+type configLoader struct {
+    configFile string
+    ctxName    string
+}
+
+func (l *configLoader) bindFlags(flags *pflag.FlagSet) {
+    flags.StringVar(&l.configFile, "config", "", "Path to the configuration file to use")
+    flags.StringVar(&l.ctxName, "context", "", "Name of the context to use")
+}
+
+func (l *configLoader) LoadRESTConfig(ctx context.Context) (config.NamespacedRESTConfig, error) {
+    // Applies env vars (GRAFANA_TOKEN, GRAFANA_PROVIDER_*), context flag,
+    // and validates. See internal/providers/slo/provider.go for the full implementation.
+}
+```
+
+### Adding a new provider
+
+Follow the `/add-provider` skill or `agent-docs/provider-guide.md` for the
+step-by-step implementation guide.
 
 ---
 
@@ -96,6 +190,11 @@ cmd/grafanactl/
 │   └── graph.go             queryGraphCodec — terminal chart via internal/graph
 ├── providers/
 │   └── command.go           providers command — lists registered providers
+├── dev/
+│   ├── command.go           dev group (import, scaffold subcommands)
+│   ├── import.go            dev import — import Grafana resources as code
+│   ├── scaffold.go          dev scaffold — scaffold a new project
+│   └── templates/           Embedded Go templates for import/scaffold
 ├── fail/
 │   ├── detailed.go          DetailedError type — rich error formatting
 │   └── convert.go           ErrorToDetailedError — error-type dispatch table

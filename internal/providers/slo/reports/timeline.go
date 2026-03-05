@@ -10,8 +10,8 @@ import (
 	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/graph"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
-	"github.com/grafana/grafanactl/internal/slo/definitions"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

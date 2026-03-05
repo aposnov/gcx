@@ -16,19 +16,15 @@ import (
 	"github.com/grafana/grafanactl/cmd/grafanactl/resources"
 	"github.com/grafana/grafanactl/internal/logs"
 	"github.com/grafana/grafanactl/internal/providers"
-	sloprovider "github.com/grafana/grafanactl/internal/slo"
+	_ "github.com/grafana/grafanactl/internal/providers/slo" // Provider registrations — blank imports trigger init() self-registration.
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 )
 
 // allProviders returns all registered providers.
-// Providers are registered here rather than in internal/providers/registry.go
-// to avoid import cycles between internal/providers and provider implementations.
+// Providers self-register via init() in their packages (imported above as blank imports).
 func allProviders() []providers.Provider {
-	return append(
-		providers.All(),
-		&sloprovider.SLOProvider{},
-	)
+	return providers.All()
 }
 
 // Command builds the root cobra command for the given version using the

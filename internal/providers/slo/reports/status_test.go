@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/grafanactl/internal/slo/definitions"
-	"github.com/grafana/grafanactl/internal/slo/reports"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
+	"github.com/grafana/grafanactl/internal/providers/slo/reports"
 )
 
 func TestBuildReportStatusResults(t *testing.T) {

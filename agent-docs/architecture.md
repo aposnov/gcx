@@ -54,14 +54,14 @@
          |            | - Processing   |
          |            +----------------+
          |
-         |            +----------------+  +----------------+
-         |            | Provider Layer |  | Query Layer    |
-         |            | (internal/     |  | (internal/     |
-         |            |  providers/)   |  |  query/)       |
-         |            | - Provider     |  | - Prometheus   |
-         |            |   interface    |  |   client       |
-         |            | - Registry     |  | - Loki client  |
-         |            | - Secret       |  | - Direct HTTP  |
+         |            +----------------+  +----------------+  +----------------+
+         |            | Provider Layer |  | Query Layer    |  | SLO Layer      |
+         |            | (internal/     |  | (internal/     |  | (internal/providers/slo/ |
+         |            |  providers/)   |  |  query/)       |  | - Definitions  |
+         |            | - Provider     |  | - Prometheus   |  | - Reports      |
+         |            |   interface    |  |   client       |  | - Provider     |
+         |            | - Registry     |  | - Loki client  |  |   registration |
+         |            | - Secret       |  | - Direct HTTP  |  +----------------+
          |            |   redaction    |  |   (no k8s      |
          |            +----------------+  |    machinery)  |
          |                               +----------------+
@@ -245,10 +245,10 @@ Config
               +-- Server, User, Password, APIToken
               +-- OrgID (on-prem) / StackID (cloud)
               +-- TLS (cert, key, CA, insecure flag)
-              +-- DefaultPrometheusDatasource (UID for query command default)
-              +-- DefaultLokiDatasource       (UID for query command default)
-              +-- Providers: map[string]map[string]string
-                    (per-provider config, indexed by provider name)
+        +-- DefaultPrometheusDatasource (UID for query command default)
+        +-- DefaultLokiDatasource       (UID for query command default)
+        +-- Providers: map[string]map[string]string
+              (per-provider config, indexed by provider name)
 ```
 
 This is a simplified kubeconfig: where kubectl separates clusters, users, and
@@ -353,7 +353,9 @@ grafanactl
   +-- query              (--config, --context as persistent flags)
   |     (single command: execute PromQL or LogQL via unified query API)
   +-- providers
-        (single command: list registered providers)
+  |     (single command: list registered providers)
+  +-- dev
+        (import, scaffold subcommands for code scaffolding workflows)
 ```
 
 ### The Options Pattern
@@ -627,6 +629,20 @@ Files most important for understanding the codebase. Organized by architectural 
 | `internal/providers/registry.go` | `All()` — compile-time provider registry |
 | `internal/providers/redact.go` | `RedactSecrets()` — secure-by-default secret redaction |
 | `cmd/grafanactl/providers/command.go` | `providers` command (list registered providers) |
+
+### SLO Provider
+
+| File | Purpose |
+|------|---------|
+| `internal/providers/slo/provider.go` | `SLOProvider` implementing the `providers.Provider` interface |
+| `internal/providers/slo/definitions/` | SLO definitions management (status, metrics via PromQL) |
+| `internal/providers/slo/reports/` | SLO reports management |
+
+### Dev Command
+
+| File | Purpose |
+|------|---------|
+| `cmd/grafanactl/dev/command.go` | `dev` command group (import, scaffold subcommands) |
 
 ### Datasource Query Clients
 

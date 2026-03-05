@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/grafanactl/internal/slo/definitions"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 )
 
 func TestComputeStatus(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/grafanactl/internal/slo/definitions"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 )
 
 // ---------------------------------------------------------------------------

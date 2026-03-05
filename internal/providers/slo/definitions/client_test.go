@@ -1,4 +1,4 @@
-package reports_test
+package definitions_test
 
 import (
 	"encoding/json"
@@ -7,18 +7,18 @@ import (
 	"testing"
 
 	"github.com/grafana/grafanactl/internal/config"
-	"github.com/grafana/grafanactl/internal/slo/reports"
+	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
 )
 
-func newTestClient(t *testing.T, server *httptest.Server) *reports.Client {
+func newTestClient(t *testing.T, server *httptest.Server) *definitions.Client {
 	t.Helper()
 	cfg := config.NamespacedRESTConfig{
 		Config: rest.Config{Host: server.URL},
 	}
-	client, err := reports.NewClient(cfg)
+	client, err := definitions.NewClient(cfg)
 	require.NoError(t, err)
 	return client
 }
@@ -36,47 +36,47 @@ func writeJSON(w http.ResponseWriter, v any) {
 
 func TestClient_List(t *testing.T) {
 	tests := []struct {
-		name        string
-		handler     http.HandlerFunc
-		wantReports int
-		wantErr     bool
+		name     string
+		handler  http.HandlerFunc
+		wantSLOs int
+		wantErr  bool
 	}{
 		{
 			name: "success with items",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodGet, r.Method)
-				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/report", r.URL.Path)
-				writeJSON(w, reports.ReportListResponse{
-					Reports: []reports.Report{
-						{UUID: "uuid-1", Name: "Report 1", Description: "First report"},
-						{UUID: "uuid-2", Name: "Report 2", Description: "Second report"},
+				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/slo", r.URL.Path)
+				writeJSON(w, definitions.SLOListResponse{
+					SLOs: []definitions.Slo{
+						{UUID: "uuid-1", Name: "SLO 1", Description: "First SLO"},
+						{UUID: "uuid-2", Name: "SLO 2", Description: "Second SLO"},
 					},
 				})
 			},
-			wantReports: 2,
-			wantErr:     false,
+			wantSLOs: 2,
+			wantErr:  false,
 		},
 		{
 			name: "empty list",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				writeJSON(w, reports.ReportListResponse{Reports: []reports.Report{}})
+				writeJSON(w, definitions.SLOListResponse{SLOs: []definitions.Slo{}})
 			},
-			wantReports: 0,
-			wantErr:     false,
+			wantSLOs: 0,
+			wantErr:  false,
 		},
 		{
-			name: "null reports field returns empty slice",
+			name: "null slos field returns empty slice",
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				writeJSON(w, reports.ReportListResponse{})
+				writeJSON(w, definitions.SLOListResponse{})
 			},
-			wantReports: 0,
-			wantErr:     false,
+			wantSLOs: 0,
+			wantErr:  false,
 		},
 		{
 			name: "server error",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
-				writeJSON(w, reports.ErrorResponse{Code: 500, Error: "internal server error"})
+				writeJSON(w, definitions.ErrorResponse{Code: 500, Error: "internal server error"})
 			},
 			wantErr: true,
 		},
@@ -88,7 +88,7 @@ func TestClient_List(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server)
-			rpts, err := client.List(t.Context())
+			slos, err := client.List(t.Context())
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -96,7 +96,7 @@ func TestClient_List(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Len(t, rpts, tt.wantReports)
+			assert.Len(t, slos, tt.wantSLOs)
 		})
 	}
 }
@@ -114,8 +114,8 @@ func TestClient_Get(t *testing.T) {
 			uuid: "uuid-1",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodGet, r.Method)
-				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/report/uuid-1", r.URL.Path)
-				writeJSON(w, reports.Report{UUID: "uuid-1", Name: "Report 1", Description: "First report"})
+				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/slo/uuid-1", r.URL.Path)
+				writeJSON(w, definitions.Slo{UUID: "uuid-1", Name: "SLO 1", Description: "First SLO"})
 			},
 			wantErr: false,
 			wantUID: "uuid-1",
@@ -125,7 +125,7 @@ func TestClient_Get(t *testing.T) {
 			uuid: "uuid-missing",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
-				writeJSON(w, reports.ErrorResponse{Code: 404, Error: "report not found"})
+				writeJSON(w, definitions.ErrorResponse{Code: 404, Error: "SLO not found"})
 			},
 			wantErr: true,
 		},
@@ -137,18 +137,18 @@ func TestClient_Get(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server)
-			report, err := client.Get(t.Context(), tt.uuid)
+			slo, err := client.Get(t.Context(), tt.uuid)
 
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.name == "not found" {
-					require.ErrorIs(t, err, reports.ErrNotFound)
+					require.ErrorIs(t, err, definitions.ErrNotFound)
 				}
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantUID, report.UUID)
+			assert.Equal(t, tt.wantUID, slo.UUID)
 		})
 	}
 }
@@ -156,60 +156,46 @@ func TestClient_Get(t *testing.T) {
 func TestClient_Create(t *testing.T) {
 	tests := []struct {
 		name    string
-		report  *reports.Report
+		slo     *definitions.Slo
 		handler http.HandlerFunc
 		wantErr bool
 		wantUID string
 	}{
 		{
 			name: "success 202",
-			report: &reports.Report{
-				Name:        "New Report",
-				Description: "A new report",
-				TimeSpan:    "calendarMonth",
-				ReportDefinition: reports.ReportDefinition{
-					Slos: []reports.ReportSlo{{SloUUID: "slo-uuid-1"}},
-				},
-			},
+			slo:  &definitions.Slo{Name: "New SLO", Description: "A new SLO"},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
-				var received reports.Report
+				var received definitions.Slo
 				if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
 					return
 				}
-				assert.Equal(t, "New Report", received.Name)
+				assert.Equal(t, "New SLO", received.Name)
 
 				w.WriteHeader(http.StatusAccepted)
-				writeJSON(w, reports.ReportCreateResponse{UUID: "new-uuid", Message: "Report created"})
+				writeJSON(w, definitions.SLOCreateResponse{UUID: "new-uuid", Message: "SLO created"})
 			},
 			wantErr: false,
 			wantUID: "new-uuid",
 		},
 		{
 			name: "success 200",
-			report: &reports.Report{
-				Name:        "New Report",
-				Description: "A new report",
-				TimeSpan:    "calendarMonth",
-				ReportDefinition: reports.ReportDefinition{
-					Slos: []reports.ReportSlo{{SloUUID: "slo-uuid-1"}},
-				},
-			},
+			slo:  &definitions.Slo{Name: "New SLO", Description: "A new SLO"},
 			handler: func(w http.ResponseWriter, r *http.Request) {
-				writeJSON(w, reports.ReportCreateResponse{UUID: "new-uuid-200", Message: "Report created"})
+				writeJSON(w, definitions.SLOCreateResponse{UUID: "new-uuid-200", Message: "SLO created"})
 			},
 			wantErr: false,
 			wantUID: "new-uuid-200",
 		},
 		{
-			name:   "400 bad request",
-			report: &reports.Report{},
+			name: "400 bad request",
+			slo:  &definitions.Slo{},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
-				writeJSON(w, reports.ErrorResponse{Code: 400, Error: "invalid report definition"})
+				writeJSON(w, definitions.ErrorResponse{Code: 400, Error: "invalid SLO definition"})
 			},
 			wantErr: true,
 		},
@@ -221,7 +207,7 @@ func TestClient_Create(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server)
-			resp, err := client.Create(t.Context(), tt.report)
+			resp, err := client.Create(t.Context(), tt.slo)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -238,38 +224,38 @@ func TestClient_Update(t *testing.T) {
 	tests := []struct {
 		name    string
 		uuid    string
-		report  *reports.Report
+		slo     *definitions.Slo
 		handler http.HandlerFunc
 		wantErr bool
 	}{
 		{
-			name:   "success 202",
-			uuid:   "uuid-1",
-			report: &reports.Report{Name: "Updated Report"},
+			name: "success 202",
+			uuid: "uuid-1",
+			slo:  &definitions.Slo{Name: "Updated SLO"},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPut, r.Method)
-				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/report/uuid-1", r.URL.Path)
+				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/slo/uuid-1", r.URL.Path)
 				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 				w.WriteHeader(http.StatusAccepted)
 			},
 			wantErr: false,
 		},
 		{
-			name:   "success 200",
-			uuid:   "uuid-1",
-			report: &reports.Report{Name: "Updated Report"},
+			name: "success 200",
+			uuid: "uuid-1",
+			slo:  &definitions.Slo{Name: "Updated SLO"},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			},
 			wantErr: false,
 		},
 		{
-			name:   "not found",
-			uuid:   "uuid-missing",
-			report: &reports.Report{Name: "Updated Report"},
+			name: "not found",
+			uuid: "uuid-missing",
+			slo:  &definitions.Slo{Name: "Updated SLO"},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
-				writeJSON(w, reports.ErrorResponse{Code: 404, Error: "report not found"})
+				writeJSON(w, definitions.ErrorResponse{Code: 404, Error: "SLO not found"})
 			},
 			wantErr: true,
 		},
@@ -281,7 +267,7 @@ func TestClient_Update(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server)
-			err := client.Update(t.Context(), tt.uuid, tt.report)
+			err := client.Update(t.Context(), tt.uuid, tt.slo)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -305,7 +291,7 @@ func TestClient_Delete(t *testing.T) {
 			uuid: "uuid-1",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodDelete, r.Method)
-				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/report/uuid-1", r.URL.Path)
+				assert.Equal(t, "/api/plugins/grafana-slo-app/resources/v1/slo/uuid-1", r.URL.Path)
 				w.WriteHeader(http.StatusNoContent)
 			},
 			wantErr: false,
@@ -323,7 +309,7 @@ func TestClient_Delete(t *testing.T) {
 			uuid: "uuid-missing",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
-				writeJSON(w, reports.ErrorResponse{Code: 404, Error: "report not found"})
+				writeJSON(w, definitions.ErrorResponse{Code: 404, Error: "SLO not found"})
 			},
 			wantErr: true,
 		},
@@ -351,25 +337,25 @@ func TestClient_ErrorResponses(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
-		errBody    reports.ErrorResponse
+		errBody    definitions.ErrorResponse
 		wantErrMsg string
 	}{
 		{
 			name:       "401 unauthorized",
 			statusCode: http.StatusUnauthorized,
-			errBody:    reports.ErrorResponse{Code: 401, Error: "unauthorized"},
+			errBody:    definitions.ErrorResponse{Code: 401, Error: "unauthorized"},
 			wantErrMsg: "401",
 		},
 		{
 			name:       "403 forbidden",
 			statusCode: http.StatusForbidden,
-			errBody:    reports.ErrorResponse{Code: 403, Error: "forbidden"},
+			errBody:    definitions.ErrorResponse{Code: 403, Error: "forbidden"},
 			wantErrMsg: "403",
 		},
 		{
 			name:       "500 internal server error",
 			statusCode: http.StatusInternalServerError,
-			errBody:    reports.ErrorResponse{Code: 500, Error: "internal server error"},
+			errBody:    definitions.ErrorResponse{Code: 500, Error: "internal server error"},
 			wantErrMsg: "500",
 		},
 	}
