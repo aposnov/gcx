@@ -244,51 +244,210 @@ func convertGrafanaResponse(grafanaResp *GrafanaQueryResponse) *QueryResponse {
 	}
 
 	for _, frame := range grafanaResult.Frames {
-		if len(frame.Schema.Fields) < 2 || len(frame.Data.Values) < 2 {
-			continue
+		// Extract stats and notices from frame metadata
+		if frame.Schema.Meta != nil {
+			frameStats := extractStats(frame.Schema.Meta.Stats)
+			if frameStats != nil {
+				if result.Data.Stats == nil {
+					result.Data.Stats = frameStats
+				} else {
+					result.Data.Stats.Summary.BytesProcessedPerSecond += frameStats.Summary.BytesProcessedPerSecond
+					result.Data.Stats.Summary.LinesProcessedPerSecond += frameStats.Summary.LinesProcessedPerSecond
+					result.Data.Stats.Summary.TotalBytesProcessed += frameStats.Summary.TotalBytesProcessed
+					result.Data.Stats.Summary.TotalLinesProcessed += frameStats.Summary.TotalLinesProcessed
+					result.Data.Stats.Summary.ExecTime += frameStats.Summary.ExecTime
+				}
+			}
+			result.Data.Notices = append(result.Data.Notices, frame.Schema.Meta.Notices...)
 		}
 
-		var timeIdx, valueIdx = -1, -1
-		var labels map[string]string
-
+		// Find field indices by name
+		fieldIndices := make(map[string]int)
 		for i, field := range frame.Schema.Fields {
-			switch field.Type {
-			case "time":
-				timeIdx = i
-			case "string", "number":
-				valueIdx = i
-			}
-			if len(field.Labels) > 0 {
-				labels = field.Labels
-			}
+			fieldIndices[field.Name] = i
 		}
 
-		if timeIdx == -1 || valueIdx == -1 {
+		labelsIdx, hasLabels := fieldIndices["labels"]
+		timestampIdx, hasTimestamp := fieldIndices["timestamp"]
+		bodyIdx, hasBody := fieldIndices["body"]
+
+		// Handle log-lines format (per-line labels in values)
+		if hasLabels && hasTimestamp && hasBody {
+			convertLogLines(frame, labelsIdx, timestampIdx, bodyIdx, result)
 			continue
 		}
 
-		timeValues := frame.Data.Values[timeIdx]
-		dataValues := frame.Data.Values[valueIdx]
-
-		if len(timeValues) == 0 || len(dataValues) == 0 {
-			continue
-		}
-
-		entry := StreamEntry{
-			Stream: labels,
-			Values: make([][]string, 0, len(timeValues)),
-		}
-
-		for i := range timeValues {
-			ts := formatTimestamp(timeValues[i])
-			value := toString(dataValues[i])
-			entry.Values = append(entry.Values, []string{ts, value})
-		}
-
-		result.Data.Result = append(result.Data.Result, entry)
+		// Fallback to legacy format (labels in field metadata)
+		convertLegacyFormat(frame, result)
 	}
 
 	return result
+}
+
+func convertLogLines(frame DataFrame, labelsIdx, timestampIdx, bodyIdx int, result *QueryResponse) {
+	if len(frame.Data.Values) <= labelsIdx ||
+		len(frame.Data.Values) <= timestampIdx ||
+		len(frame.Data.Values) <= bodyIdx {
+		return
+	}
+
+	labelsValues := frame.Data.Values[labelsIdx]
+	timestampValues := frame.Data.Values[timestampIdx]
+	bodyValues := frame.Data.Values[bodyIdx]
+
+	numEntries := len(timestampValues)
+	if numEntries == 0 {
+		return
+	}
+
+	// Get nanoseconds array if available
+	var nanos []int
+	if len(frame.Data.Nanos) > timestampIdx && frame.Data.Nanos[timestampIdx] != nil {
+		nanos = frame.Data.Nanos[timestampIdx]
+	}
+
+	// Group entries by labels
+	streamMap := make(map[string]*StreamEntry)
+	streamOrder := make([]string, 0)
+
+	for i := range numEntries {
+		labels := parseLabels(labelsValues[i])
+		ts := formatTimestampWithNanos(timestampValues[i], nanos, i)
+		body := toString(bodyValues[i])
+
+		key := labelsKey(labels)
+		entry, exists := streamMap[key]
+		if !exists {
+			entry = &StreamEntry{
+				Stream: labels,
+				Values: make([][]string, 0),
+			}
+			streamMap[key] = entry
+			streamOrder = append(streamOrder, key)
+		}
+		entry.Values = append(entry.Values, []string{ts, body})
+	}
+
+	for _, key := range streamOrder {
+		result.Data.Result = append(result.Data.Result, *streamMap[key])
+	}
+}
+
+func convertLegacyFormat(frame DataFrame, result *QueryResponse) {
+	if len(frame.Schema.Fields) < 2 || len(frame.Data.Values) < 2 {
+		return
+	}
+
+	var timeIdx, valueIdx = -1, -1
+	var labels map[string]string
+
+	for i, field := range frame.Schema.Fields {
+		switch field.Type {
+		case "time":
+			timeIdx = i
+		case "string", "number":
+			valueIdx = i
+		}
+		if len(field.Labels) > 0 {
+			labels = field.Labels
+		}
+	}
+
+	if timeIdx == -1 || valueIdx == -1 {
+		return
+	}
+
+	timeValues := frame.Data.Values[timeIdx]
+	dataValues := frame.Data.Values[valueIdx]
+
+	if len(timeValues) == 0 || len(dataValues) == 0 {
+		return
+	}
+
+	entry := StreamEntry{
+		Stream: labels,
+		Values: make([][]string, 0, len(timeValues)),
+	}
+
+	for i := range timeValues {
+		ts := formatTimestamp(timeValues[i])
+		value := toString(dataValues[i])
+		entry.Values = append(entry.Values, []string{ts, value})
+	}
+
+	result.Data.Result = append(result.Data.Result, entry)
+}
+
+func extractStats(frameStats []FrameStat) *QueryStats {
+	if len(frameStats) == 0 {
+		return nil
+	}
+
+	stats := &QueryStats{}
+	for _, s := range frameStats {
+		switch s.DisplayName {
+		case "Summary: bytes processed per second":
+			stats.Summary.BytesProcessedPerSecond = int64(s.Value)
+		case "Summary: lines processed per second":
+			stats.Summary.LinesProcessedPerSecond = int64(s.Value)
+		case "Summary: total bytes processed":
+			stats.Summary.TotalBytesProcessed = int64(s.Value)
+		case "Summary: total lines processed":
+			stats.Summary.TotalLinesProcessed = int64(s.Value)
+		case "Summary: exec time":
+			stats.Summary.ExecTime = s.Value
+		}
+	}
+	return stats
+}
+
+func parseLabels(v any) map[string]string {
+	if v == nil {
+		return nil
+	}
+	if m, ok := v.(map[string]any); ok {
+		labels := make(map[string]string, len(m))
+		for k, val := range m {
+			labels[k] = toString(val)
+		}
+		return labels
+	}
+	if m, ok := v.(map[string]string); ok {
+		return m
+	}
+	return nil
+}
+
+func labelsKey(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(labels)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func formatTimestampWithNanos(v any, nanos []int, idx int) string {
+	var millis int64
+	switch val := v.(type) {
+	case float64:
+		millis = int64(val)
+	case int64:
+		millis = val
+	case int:
+		millis = int64(val)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+
+	// Convert to nanoseconds: millis * 1e6 + nanos
+	nanosTotal := millis * 1e6
+	if nanos != nil && idx < len(nanos) {
+		nanosTotal += int64(nanos[idx])
+	}
+	return strconv.FormatInt(nanosTotal, 10)
 }
 
 func formatTimestamp(v any) string {

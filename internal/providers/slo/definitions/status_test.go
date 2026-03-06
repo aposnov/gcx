@@ -9,8 +9,10 @@ import (
 	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 )
 
-func ptrFloat64(v float64) *float64 { return &v }
+//nolint:modernize // ptr() creates pointer to value, not pointer to type like new()
+func ptr(f float64) *float64 { return &f }
 
+//nolint:modernize // ptr() creates pointer to value, not pointer to type
 func TestComputeStatus(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -22,21 +24,21 @@ func TestComputeStatus(t *testing.T) {
 		{
 			name:      "OK when SLI meets objective",
 			slo:       definitions.Slo{},
-			sli:       ptrFloat64(0.999),
+			sli:       ptr(0.999),
 			objective: 0.995,
 			want:      "OK",
 		},
 		{
 			name:      "OK when SLI equals objective",
 			slo:       definitions.Slo{},
-			sli:       ptrFloat64(0.995),
+			sli:       ptr(0.995),
 			objective: 0.995,
 			want:      "OK",
 		},
 		{
 			name:      "BREACHING when SLI below objective",
 			slo:       definitions.Slo{},
-			sli:       ptrFloat64(0.990),
+			sli:       ptr(0.990),
 			objective: 0.995,
 			want:      "BREACHING",
 		},
@@ -65,7 +67,7 @@ func TestComputeStatus(t *testing.T) {
 					Status: &definitions.Status{Type: "error"},
 				},
 			},
-			sli:       ptrFloat64(0.999),
+			sli:       ptr(0.999),
 			objective: 0.995,
 			want:      "Error",
 		},
@@ -76,7 +78,7 @@ func TestComputeStatus(t *testing.T) {
 					Status: &definitions.Status{Type: "running"},
 				},
 			},
-			sli:       ptrFloat64(0.999),
+			sli:       ptr(0.999),
 			objective: 0.995,
 			want:      "OK",
 		},
@@ -143,6 +145,7 @@ func TestComputeBudget(t *testing.T) {
 	}
 }
 
+//nolint:modernize // ptr() creates pointer to value, not pointer to type
 func TestStatusTableCodec_Encode(t *testing.T) {
 	results := []definitions.StatusResult{
 		{
@@ -150,8 +153,8 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 			UUID:      "abc123def",
 			Objective: 0.995,
 			Window:    "28d",
-			SLI:       ptrFloat64(0.9972),
-			Budget:    ptrFloat64(0.44),
+			SLI:       ptr(0.9972),
+			Budget:    ptr(0.44),
 			Status:    "OK",
 		},
 		{
@@ -159,8 +162,8 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 			UUID:      "xyz789ghi",
 			Objective: 0.999,
 			Window:    "28d",
-			SLI:       ptrFloat64(0.9985),
-			Budget:    ptrFloat64(-0.50),
+			SLI:       ptr(0.9985),
+			Budget:    ptr(-0.50),
 			Status:    "BREACHING",
 		},
 		{
@@ -224,11 +227,11 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 				UUID:      "abc123def",
 				Objective: 0.995,
 				Window:    "28d",
-				SLI:       ptrFloat64(0.9972),
-				Budget:    ptrFloat64(0.44),
+				SLI:       ptr(0.9972),
+				Budget:    ptr(0.44),
 				BurnRate:  &burnRate,
-				SLI1h:     ptrFloat64(0.9991),
-				SLI1d:     ptrFloat64(0.9980),
+				SLI1h:     ptr(0.9991),
+				SLI1d:     ptr(0.9980),
 				Status:    "OK",
 			},
 		}
@@ -267,6 +270,7 @@ func TestStatusTableCodec_InvalidType(t *testing.T) {
 	}
 }
 
+//nolint:modernize // ptr() creates pointer to value, not pointer to type
 func TestBuildStatusResults(t *testing.T) {
 	slos := []definitions.Slo{
 		{
@@ -280,7 +284,7 @@ func TestBuildStatusResults(t *testing.T) {
 
 	burnRate := 2.0
 	metrics := map[string]definitions.MetricData{
-		"uuid-1": {SLI: ptrFloat64(0.9972), BurnRate: &burnRate},
+		"uuid-1": {SLI: ptr(0.9972), BurnRate: &burnRate},
 	}
 
 	results := definitions.BuildStatusResults(slos, metrics)

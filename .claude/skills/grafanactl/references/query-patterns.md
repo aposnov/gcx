@@ -33,7 +33,7 @@ grafanactl config set contexts.mystack.default-loki-datasource <uid>
 
 # Now queries work without -d flag
 grafanactl query -e 'up'
-grafanactl query -t loki -e '{job="varlogs"}'
+grafanactl query -e '{job="varlogs"}'
 ```
 
 ## Prometheus Query Patterns
@@ -60,15 +60,15 @@ Query over time periods:
 ```bash
 # HTTP request rate over last hour
 grafanactl query -d <uid> -e 'rate(http_requests_total[5m])' \
-  --start now-1h --end now --step 1m
+  --from now-1h --to now --step 1m
 
 # CPU usage for specific time period
 grafanactl query -d <uid> -e 'avg(cpu_usage)' \
-  --start 2026-03-01T00:00:00Z --end 2026-03-01T12:00:00Z --step 5m
+  --from 2026-03-01T00:00:00Z --to 2026-03-01T12:00:00Z --step 5m
 
 # Disk usage over last 24 hours
 grafanactl query -d <uid> -e 'disk_used_percent' \
-  --start now-24h --end now --step 15m
+  --from now-24h --to now --step 15m
 ```
 
 ### Time Range Formats
@@ -77,15 +77,15 @@ grafanactl supports multiple time formats:
 
 ```bash
 # Relative time (recommended for most cases)
---start now-1h --end now
---start now-24h --end now-1h
---start now-7d --end now
+--from now-1h --to now
+--from now-24h --to now-1h
+--from now-7d --to now
 
 # RFC3339 timestamps
---start 2026-03-01T00:00:00Z --end 2026-03-01T12:00:00Z
+--from 2026-03-01T00:00:00Z --to 2026-03-01T12:00:00Z
 
 # Unix timestamps
---start 1709280000 --end 1709366400
+--from 1709280000 --to 1709366400
 ```
 
 ### Step Interval
@@ -95,15 +95,15 @@ Choose step based on time range:
 ```bash
 # Short ranges: 1-5 second steps
 grafanactl query -d <uid> -e 'rate(requests[1m])' \
-  --start now-5m --end now --step 1s
+  --from now-5m --to now --step 1s
 
 # Medium ranges: 1-5 minute steps
 grafanactl query -d <uid> -e 'rate(requests[5m])' \
-  --start now-6h --end now --step 1m
+  --from now-6h --to now --step 1m
 
 # Long ranges: 15-60 minute steps
 grafanactl query -d <uid> -e 'rate(requests[1h])' \
-  --start now-7d --end now --step 1h
+  --from now-7d --to now --step 1h
 ```
 
 **Rule of thumb**: Step should be ~1/100th of total range for smooth charts.
@@ -129,7 +129,7 @@ grafanactl query -d <uid> -e 'histogram_quantile(0.95, rate(http_request_duratio
 ```bash
 # Line chart (default)
 grafanactl query -d <uid> -e 'rate(http_requests_total[5m])' \
-  --start now-1h --end now --step 1m -o json | \
+  --from now-1h --to now --step 1m -o json | \
   grafanactl graph --title "HTTP Request Rate"
 
 # Bar chart for instant queries
@@ -137,7 +137,7 @@ grafanactl query -d <uid> -e 'up' -o json | \
   grafanactl graph --type bar --title "Service Uptime"
 
 # Custom dimensions
-grafanactl query -d <uid> -e 'cpu_usage' --start now-6h --end now --step 5m -o json | \
+grafanactl query -d <uid> -e 'cpu_usage' --from now-6h --to now --step 5m -o json | \
   grafanactl graph --width 120 --height 30 --title "CPU Usage (6h)"
 ```
 
@@ -149,32 +149,32 @@ Basic log filtering:
 
 ```bash
 # All logs from a job
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"}'
+grafanactl query -d <loki-uid> -e '{job="varlogs"}'
 
 # Multiple labels (AND)
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs",level="error"}'
+grafanactl query -d <loki-uid> -e '{job="varlogs",level="error"}'
 
 # Regex matching
-grafanactl query -d <loki-uid> -t loki -e '{job=~"mysql.*",level!="debug"}'
+grafanactl query -d <loki-uid> -e '{job=~"mysql.*",level!="debug"}'
 
 # Exclude specific values
-grafanactl query -d <loki-uid> -t loki -e '{namespace="production",pod!~"test.*"}'
+grafanactl query -d <loki-uid> -e '{namespace="production",pod!~"test.*"}'
 ```
 
 ### Log Stream Operators
 
 ```bash
 # Contains text
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"} |= "error"'
+grafanactl query -d <loki-uid> -e '{job="varlogs"} |= "error"'
 
 # Doesn't contain text
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"} != "debug"'
+grafanactl query -d <loki-uid> -e '{job="varlogs"} != "debug"'
 
 # Regex match in log line
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"} |~ "error|exception"'
+grafanactl query -d <loki-uid> -e '{job="varlogs"} |~ "error|exception"'
 
 # JSON parsing
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"} | json | level="error"'
+grafanactl query -d <loki-uid> -e '{job="varlogs"} | json | level="error"'
 ```
 
 ### Log Range Queries
@@ -183,12 +183,12 @@ Query logs over time:
 
 ```bash
 # Last hour of logs
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"}' \
-  --start now-1h --end now
+grafanactl query -d <loki-uid> -e '{job="varlogs"}' \
+  --from now-1h --to now
 
 # Specific time range
-grafanactl query -d <loki-uid> -t loki -e '{namespace="prod"}' \
-  --start 2026-03-01T00:00:00Z --end 2026-03-01T12:00:00Z
+grafanactl query -d <loki-uid> -e '{namespace="prod"}' \
+  --from 2026-03-01T00:00:00Z --to 2026-03-01T12:00:00Z
 ```
 
 ### Log Metrics (Rate Queries)
@@ -197,34 +197,34 @@ Calculate metrics from logs:
 
 ```bash
 # Log rate per second
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'rate({job="varlogs"}[5m])' \
-  --start now-1h --end now --step 1m
+  --from now-1h --to now --step 1m
 
 # Sum of log rates
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'sum(rate({namespace="production"}[5m]))' \
-  --start now-6h --end now --step 5m
+  --from now-6h --to now --step 5m
 
 # Count by level
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'sum by(level) (rate({job="varlogs"} | json [5m]))' \
-  --start now-1h --end now --step 1m
+  --from now-1h --to now --step 1m
 ```
 
 ### Combining Loki with Graph
 
 ```bash
 # Visualize log volume
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'sum(rate({job="varlogs"}[5m]))' \
-  --start now-6h --end now --step 5m -o json | \
+  --from now-6h --to now --step 5m -o json | \
   grafanactl graph --title "Log Volume (logs/sec)"
 
 # Error rate over time
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'sum(rate({job="app"} |= "error" [5m]))' \
-  --start now-24h --end now --step 15m -o json | \
+  --from now-24h --to now --step 15m -o json | \
   grafanactl graph --title "Error Rate"
 ```
 
@@ -307,20 +307,41 @@ grafanactl datasources loki series -d <loki-uid> -M '{job="varlogs"}'
 
 4. Query specific stream:
 ```bash
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs",namespace="prod"}'
+grafanactl query -d <loki-uid> -e '{job="varlogs",namespace="prod"}'
 ```
 
 ## Output Formats
 
 ### Table Format (Default)
 
-Human-readable table output:
+For Prometheus queries, shows metric values in a table:
 
 ```bash
 grafanactl query -d <uid> -e 'up'
 # Output:
 # METRIC    VALUE  TIMESTAMP
 # up{...}   1      2026-03-03T12:00:00Z
+```
+
+For Loki queries, shows raw log lines:
+
+```bash
+grafanactl query -d <loki-uid> -e '{job="varlogs"}' --from now-5m --to now
+# Output:
+# ts=2026-03-06T10:30:00Z level=info msg="request completed" status=200
+# ts=2026-03-06T10:30:01Z level=error msg="connection refused"
+```
+
+### Wide Format (Loki only)
+
+Shows all labels plus the log line:
+
+```bash
+grafanactl query -d <loki-uid> -e '{job="varlogs"}' --from now-5m --to now -o wide
+# Output:
+# CLUSTER        DETECTED_LEVEL  JOB       NAMESPACE  POD          LINE
+# dev-eu-west-2  info            varlogs   prod       app-abc123   ts=2026-03-06T10:30:00Z...
+# dev-eu-west-2  error           varlogs   prod       app-abc123   ts=2026-03-06T10:30:01Z...
 ```
 
 ### JSON Format
@@ -398,7 +419,7 @@ QUERIES=(
 
 for query in "${QUERIES[@]}"; do
   echo "Query: $query"
-  grafanactl query -d $DS_UID -e "$query" --start now-5m --end now -o json | \
+  grafanactl query -d $DS_UID -e "$query" --from now-5m --to now -o json | \
     grafanactl graph --title "$query"
   echo "---"
 done
@@ -408,7 +429,7 @@ done
 
 ```bash
 # Export query results to file
-grafanactl query -d <uid> -e 'cpu_usage' --start now-24h --end now --step 1m -o json > cpu-data.json
+grafanactl query -d <uid> -e 'cpu_usage' --from now-24h --to now --step 1m -o json > cpu-data.json
 
 # Convert to CSV (using jq)
 grafanactl query -d <uid> -e 'up' -o json | \
@@ -441,8 +462,8 @@ grafanactl query -d <uid> -e 'rate(requests[1h])'  # Usually unnecessary
 3. **Limit time ranges**:
 ```bash
 # Query only what you need
-grafanactl query -d <uid> -e 'up' --start now-1h --end now  # Good
-grafanactl query -d <uid> -e 'up' --start now-30d --end now  # Slow
+grafanactl query -d <uid> -e 'up' --from now-1h --to now  # Good
+grafanactl query -d <uid> -e 'up' --from now-30d --to now  # Slow
 ```
 
 ### Loki Performance
@@ -450,17 +471,17 @@ grafanactl query -d <uid> -e 'up' --start now-30d --end now  # Slow
 1. **Use indexed labels for filtering**:
 ```bash
 # Fast (uses indexed labels)
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs",namespace="prod"}'
+grafanactl query -d <loki-uid> -e '{job="varlogs",namespace="prod"}'
 
 # Slow (line filter, not indexed)
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"} |= "namespace:prod"'
+grafanactl query -d <loki-uid> -e '{job="varlogs"} |= "namespace:prod"'
 ```
 
 2. **Limit log queries**:
 ```bash
 # The default limit is 1000 lines
 # For production, consider increasing or narrowing time range
-grafanactl query -d <loki-uid> -t loki -e '{job="varlogs"}' --start now-5m --end now
+grafanactl query -d <loki-uid> -e '{job="varlogs"}' --from now-5m --to now
 ```
 
 ## Common Patterns
@@ -477,7 +498,7 @@ grafanactl query -d <uid> -e 'up{job="critical-service"}' | grep "1"
 ```bash
 # HTTP error rate
 grafanactl query -d <uid> -e 'rate(http_requests_total{status=~"5.."}[5m])' \
-  --start now-1h --end now --step 1m -o json | grafanactl graph
+  --from now-1h --to now --step 1m -o json | grafanactl graph
 ```
 
 ### Resource Usage
@@ -492,7 +513,7 @@ grafanactl query -d <uid> -e 'container_memory_usage_bytes{namespace="production
 
 ```bash
 # Count errors in last hour
-grafanactl query -d <loki-uid> -t loki \
+grafanactl query -d <loki-uid> \
   -e 'count_over_time({job="app"} |= "error" [1h])'
 ```
 
@@ -500,6 +521,6 @@ grafanactl query -d <loki-uid> -t loki \
 
 ```bash
 # Compare current vs 24h ago
-grafanactl query -d <uid> -e 'rate(requests[5m])' --start now-1h --end now -o json > now.json
-grafanactl query -d <uid> -e 'rate(requests[5m])' --start now-25h --end now-24h -o json > yesterday.json
+grafanactl query -d <uid> -e 'rate(requests[5m])' --from now-1h --to now -o json > now.json
+grafanactl query -d <uid> -e 'rate(requests[5m])' --from now-25h --to now-24h -o json > yesterday.json
 ```

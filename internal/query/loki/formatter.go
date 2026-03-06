@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strconv"
 	"strings"
 	"text/tabwriter"
-	"time"
 )
 
 func FormatQueryTable(w io.Writer, resp *QueryResponse) error {
@@ -16,20 +14,41 @@ func FormatQueryTable(w io.Writer, resp *QueryResponse) error {
 		return nil
 	}
 
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+	for _, stream := range resp.Data.Result {
+		for _, value := range stream.Values {
+			if len(value) < 2 {
+				continue
+			}
+			fmt.Fprintln(w, value[1])
+		}
+	}
 
+	return nil
+}
+
+func FormatQueryTableWide(w io.Writer, resp *QueryResponse) error {
+	if len(resp.Data.Result) == 0 {
+		fmt.Fprintln(w, "No data")
+		return nil
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	labelNames := collectStreamLabelNames(resp.Data.Result)
 
-	header := make([]string, 0, len(labelNames)+2)
+	header := make([]string, 0, len(labelNames)+1)
 	for _, name := range labelNames {
 		header = append(header, strings.ToUpper(name))
 	}
-	header = append(header, "TIMESTAMP", "LINE")
+	header = append(header, "LINE")
 	fmt.Fprintln(tw, strings.Join(header, "\t"))
 
 	for _, stream := range resp.Data.Result {
 		for _, value := range stream.Values {
-			row := make([]string, 0, len(labelNames)+2)
+			if len(value) < 2 {
+				continue
+			}
+
+			row := make([]string, 0, len(labelNames)+1)
 			for _, name := range labelNames {
 				if val, ok := stream.Stream[name]; ok {
 					row = append(row, val)
@@ -37,15 +56,7 @@ func FormatQueryTable(w io.Writer, resp *QueryResponse) error {
 					row = append(row, "")
 				}
 			}
-
-			if len(value) >= 2 {
-				ts := parseNanoTimestamp(value[0])
-				line := value[1]
-				if len(line) > 100 {
-					line = line[:97] + "..."
-				}
-				row = append(row, ts, line)
-			}
+			row = append(row, value[1])
 			fmt.Fprintln(tw, strings.Join(row, "\t"))
 		}
 	}
@@ -97,7 +108,9 @@ func collectStreamLabelNames(streams []StreamEntry) []string {
 	nameSet := make(map[string]struct{})
 	for _, stream := range streams {
 		for name := range stream.Stream {
-			nameSet[name] = struct{}{}
+			if !isHiddenLabel(name) {
+				nameSet[name] = struct{}{}
+			}
 		}
 	}
 
@@ -108,6 +121,10 @@ func collectStreamLabelNames(streams []StreamEntry) []string {
 	sort.Strings(names)
 
 	return names
+}
+
+func isHiddenLabel(name string) bool {
+	return strings.HasPrefix(name, "__")
 }
 
 func collectLabelNames(series []map[string]string) []string {
@@ -125,13 +142,4 @@ func collectLabelNames(series []map[string]string) []string {
 	sort.Strings(names)
 
 	return names
-}
-
-func parseNanoTimestamp(tsStr string) string {
-	nanos, err := strconv.ParseInt(tsStr, 10, 64)
-	if err != nil {
-		return tsStr
-	}
-	t := time.Unix(0, nanos)
-	return t.Format(time.RFC3339Nano)
 }

@@ -31,6 +31,7 @@ type QueryResultData struct {
 	ResultType string        `json:"resultType"`
 	Result     []StreamEntry `json:"result"`
 	Stats      *QueryStats   `json:"stats,omitempty"`
+	Notices    []FrameNotice `json:"notices,omitempty"`
 }
 
 // StreamEntry represents a single log stream from the query result.
@@ -86,8 +87,31 @@ type DataFrame struct {
 
 // DataFrameSchema describes the structure of a data frame.
 type DataFrameSchema struct {
-	Name   string  `json:"name,omitempty"`
-	Fields []Field `json:"fields,omitempty"`
+	RefId  string     `json:"refId,omitempty"`
+	Meta   *FrameMeta `json:"meta,omitempty"`
+	Name   string     `json:"name,omitempty"`
+	Fields []Field    `json:"fields,omitempty"`
+}
+
+// FrameMeta contains metadata about a data frame.
+type FrameMeta struct {
+	Type                string        `json:"type,omitempty"`
+	Stats               []FrameStat   `json:"stats,omitempty"`
+	Notices             []FrameNotice `json:"notices,omitempty"`
+	ExecutedQueryString string        `json:"executedQueryString,omitempty"`
+}
+
+// FrameStat represents a single statistic from query execution.
+type FrameStat struct {
+	DisplayName string  `json:"displayName"`
+	Unit        string  `json:"unit,omitempty"`
+	Value       float64 `json:"value"`
+}
+
+// FrameNotice represents a notice or warning from the query.
+type FrameNotice struct {
+	Severity string `json:"severity"`
+	Text     string `json:"text"`
 }
 
 // Field describes a field in a data frame.
@@ -100,4 +124,5 @@ type Field struct {
 // DataFrameData contains the actual data values.
 type DataFrameData struct {
 	Values [][]any `json:"values,omitempty"`
+	Nanos  [][]int `json:"nanos,omitempty"`
 }
