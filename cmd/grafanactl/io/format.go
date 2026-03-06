@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/grafana/grafanactl/internal/agent"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/spf13/pflag"
 )
@@ -35,6 +36,12 @@ func (opts *Options) BindFlags(flags *pflag.FlagSet) {
 	defaultFormat := "json"
 	if opts.defaultFormat != "" {
 		defaultFormat = opts.defaultFormat
+	}
+
+	// Agent mode: override any per-command default with JSON.
+	// Explicit -o flag from user still takes precedence (via cobra flag parsing).
+	if agent.IsAgentMode() {
+		defaultFormat = "json"
 	}
 
 	flags.StringVarP(&opts.OutputFormat, "output", "o", defaultFormat, "Output format. One of: "+strings.Join(opts.allowedCodecs(), ", "))

@@ -56,7 +56,7 @@ JSON/YAML to silently omit fields. See Pattern 13 in `patterns.md`.
 | `list`, `get` | `text` (with table codec) | Human-scannable |
 | `config view` | `yaml` | Config is YAML-native |
 | `push`, `pull`, `delete` | Status messages only | Operations, not data |
-| Agent mode (Section 7) | `json` | Machine-parseable |
+| Agent mode (Section 6) | `json` | Machine-parseable |
 
 When building a new command: call `ioOpts.DefaultFormat("text")` for data
 display commands and register a table codec. Don't leave `json` as the default
@@ -88,19 +88,27 @@ introspecting API responses. Tracked by R3.1.
 
 ## 2. Exit Code Taxonomy
 
-### 2.1 Target Codes `[ADOPT]`
+### 2.1 Exit Codes `[CURRENT]`
 
-| Code | Meaning | When |
-|------|---------|------|
-| 0 | Success | Command completed without errors |
-| 1 | General error | Unexpected error, business logic failure |
-| 2 | Usage error | Bad flags, invalid selectors, missing args |
-| 3 | Auth failure | 401/403, missing or invalid credentials |
-| 4 | Partial failure | Some resources succeeded, others failed |
+| Code | Constant | Meaning | When |
+|------|----------|---------|------|
+| 0 | `ExitSuccess` | Success | Command completed without errors |
+| 1 | `ExitGeneralError` | General error | Unexpected error, business logic failure |
+| 2 | `ExitUsageError` | Usage error | Bad flags, invalid selectors, missing args `[RESERVED]` |
+| 3 | `ExitAuthFailure` | Auth failure | 401/403, missing or invalid credentials |
+| 4 | `ExitPartialFailure` | Partial failure | Some resources succeeded, others failed `[RESERVED]` |
+| 5 | `ExitCancelled` | Cancelled | User pressed Ctrl+C (SIGINT) or `context.Canceled` |
+| 6 | `ExitVersionIncompatible` | Version incompatible | Grafana version < 12 detected |
 
-**Current state:** `main.go:handleError` defaults to exit code 1.
-`DetailedError.ExitCode` can override it, but no converter sets a differentiated
-code today.
+Constants defined in `cmd/grafanactl/fail/exitcodes.go`.
+
+**Implementation state:**
+- Exit code 3 (auth failure) is set by `convertAPIErrors` for HTTP 401/403.
+- Exit code 5 (cancelled) is set by `convertContextCanceled` (first in converter
+  chain) and by a fast-path check in `handleError` for `context.Canceled`.
+- SIGINT is handled via `signal.NotifyContext` in `main.go`, which cancels the
+  context and produces exit code 5.
+- Exit codes 2, 4, and 6 are defined as constants but not yet wired to converters.
 
 ### 2.2 Setting Exit Codes in Converters `[ADOPT]`
 
@@ -324,36 +332,50 @@ Reference: `cmd/grafanactl/root/command.go` (`PersistentPreRun`)
 
 ## 6. Agent Mode
 
-> All items in this section are `[PLANNED]`. Tracked by R1.3.
+### 6.1 Detection `[CURRENT]`
 
-### 6.1 Detection
+Agent mode is detected via environment variables at `init()` time in
+`internal/agent/agent.go` and via the `--agent` CLI flag pre-parsed in
+`main.go` before Cobra command construction.
 
-Check environment variables in root `PersistentPreRun`:
+| Variable | Set by | Effect |
+|----------|--------|--------|
+| `GRAFANACTL_AGENT_MODE` | Explicit opt-in/out | `1`/`true`/`yes` enables; `0`/`false`/`no` **disables** (overrides all others) |
+| `CLAUDE_CODE` | Claude Code | Truthy value activates agent mode |
+| `CURSOR_AGENT` | Cursor | Truthy value activates agent mode |
+| `GITHUB_COPILOT` | GitHub Copilot | Truthy value activates agent mode |
+| `AMAZON_Q` | Amazon Q | Truthy value activates agent mode |
 
-| Variable | Set by |
-|----------|--------|
-| `GRAFANACTL_AGENT_MODE=true` | Explicit opt-in |
-| `CLAUDE_CODE=1` | Claude Code |
-| `CURSOR_AGENT=1` | Cursor |
+The `--agent` persistent flag can also enable agent mode. `--agent=false`
+explicitly disables agent mode even when env vars are set.
 
-If any is set, activate agent mode.
+**Priority order:** `GRAFANACTL_AGENT_MODE=0` (disable) > any truthy env var
+(enable) > `--agent` flag > default (disabled).
 
-### 6.2 Behavior Changes
+**API:** `agent.IsAgentMode() bool`, `agent.SetFlag(bool)`, `agent.DetectedFromEnv() bool`
+
+Reference: `internal/agent/agent.go`
+
+### 6.2 Behavior Changes `[CURRENT]`
 
 When agent mode is active:
-1. **Default output format** becomes `json` for list/get commands
-2. **Color** is disabled
-3. **Spinners/progress indicators** are suppressed
-4. **Confirmation prompts** are auto-approved
-5. **Error output** includes machine-readable hints (Section 4.4)
+1. **Default output format** becomes `json` for all commands (overrides
+   per-command `DefaultFormat()` in `io.Options.BindFlags()`)
+2. **Color** is disabled (`color.NoColor = true` in `PersistentPreRun`)
 
-### 6.3 Opt-Out
+The following are **not yet implemented** (`[PLANNED]`):
+3. Spinners/progress indicators suppressed
+4. Confirmation prompts auto-approved (Section 3.3)
+5. Error output includes machine-readable hints (Section 4.4)
 
-Explicit flags override agent mode:
+### 6.3 Opt-Out `[CURRENT]`
+
+Explicit flags override agent mode defaults:
 - `-o text` or `-o yaml` overrides the JSON default
-- `--no-agent-mode` disables detection entirely
+- `--agent=false` disables agent mode entirely (even when env vars are set)
+- `GRAFANACTL_AGENT_MODE=0` disables agent mode regardless of other env vars
 
-### 6.4 Exempt Commands
+### 6.4 Exempt Commands `[PLANNED]`
 
 Commands that produce non-data output are exempt from format switching:
 - `config set`, `config use-context` — confirmations only
@@ -544,18 +566,18 @@ Accepts: `1`, `true`, `0`, `false` (parsed by `caarlos0/env/v11`)
 
 **Implementation:** `internal/config/cli_options.go` - `CLIOptions` struct loaded via `LoadCLIOptions()`
 
-### Planned Variables `[PLANNED]`
-
-| Variable | Effect |
-|----------|--------|
-| `GRAFANACTL_AGENT_MODE` | Force agent mode (R1.3) |
-
-### Detected Variables `[PLANNED]`
+### Agent Mode Variables `[CURRENT]`
 
 | Variable | Source | Effect |
 |----------|--------|--------|
-| `CLAUDE_CODE` | Claude Code | Auto-activate agent mode |
-| `CURSOR_AGENT` | Cursor | Auto-activate agent mode |
+| `GRAFANACTL_AGENT_MODE` | Explicit opt-in/out | `1`/`true`/`yes` enables agent mode; `0`/`false`/`no` disables (overrides all others) |
+| `CLAUDE_CODE` | Claude Code | Truthy value activates agent mode |
+| `CURSOR_AGENT` | Cursor | Truthy value activates agent mode |
+| `GITHUB_COPILOT` | GitHub Copilot | Truthy value activates agent mode |
+| `AMAZON_Q` | Amazon Q | Truthy value activates agent mode |
+
+Detection runs at `init()` time in `internal/agent/agent.go`. See Section 6.1 for
+full detection priority and the `--agent` flag.
 
 ---
 
@@ -565,9 +587,9 @@ Maps sections to the cli-analysis recommendations (R1.1–R3.5):
 
 | R# | Description | Section | Status |
 |----|-------------|---------|--------|
-| R1.1 | Exit code taxonomy | 2 | `[ADOPT]` |
+| R1.1 | Exit code taxonomy | 2 | `[CURRENT]` |
 | R1.2 | Auto-approve | 3.2, 3.3 | `[IMPLEMENTED]` (3.2) / `[PLANNED]` (3.3) |
-| R1.3 | Agent mode | 6 | `[PLANNED]` |
+| R1.3 | Agent mode | 6 | `[CURRENT]` (detection + format/color) / `[PLANNED]` (auto-approve, structured errors) |
 | R2.1 | Help formatting page | 8.3 | `[PLANNED]` |
 | R2.2 | Help environment page | 10, 8.3 | `[CURRENT]` / `[PLANNED]` |
 | R2.3 | Automation guide | — | Out of scope (separate doc) |

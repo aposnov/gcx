@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -10,6 +11,15 @@ import (
 	goapi "github.com/grafana/grafana-openapi-client-go/client"
 	"github.com/grafana/grafanactl/internal/config"
 )
+
+// VersionIncompatibleError is returned when a Grafana instance is too old for grafanactl.
+type VersionIncompatibleError struct {
+	Version *semver.Version
+}
+
+func (e *VersionIncompatibleError) Error() string {
+	return fmt.Sprintf("grafana version %s is not supported; grafanactl requires Grafana 12.0.0 or later", e.Version)
+}
 
 func ClientFromContext(ctx *config.Context) (*goapi.GrafanaHTTPAPI, error) {
 	if ctx == nil {

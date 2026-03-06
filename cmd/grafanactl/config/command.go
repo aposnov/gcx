@@ -340,18 +340,21 @@ func checkCmd(configOpts *Options) *cobra.Command {
 
 			cmd.Println()
 
+			var checkErr error
 			for _, gCtx := range cfg.Contexts {
-				checkContext(cmd, gCtx)
+				if err := checkContext(cmd, gCtx); err != nil {
+					checkErr = err
+				}
 			}
 
-			return nil
+			return checkErr
 		},
 	}
 
 	return cmd
 }
 
-func checkContext(cmd *cobra.Command, gCtx *config.Context) {
+func checkContext(cmd *cobra.Command, gCtx *config.Context) error {
 	stdout := cmd.OutOrStdout()
 	title := "Context: "
 	titleLen := len(title) + len(gCtx.Name)
@@ -383,7 +386,7 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) {
 		io.Warning(stdout, "Grafana version: %s", io.Yellow("skipped")+"\n")
 
 		printSuggestions(err)
-		return
+		return nil
 	}
 
 	io.Success(stdout, "Configuration: %s", io.Green("valid"))
@@ -392,7 +395,7 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) {
 		io.Error(stdout, "Connectivity: %s", io.Red(summarizeError(err)))
 		io.Warning(stdout, "Grafana version: %s", io.Yellow("skipped")+"\n")
 		printSuggestions(err)
-		return
+		return nil
 	}
 
 	io.Success(stdout, "Connectivity: %s", io.Green("online"))
@@ -400,15 +403,16 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) {
 	version, err := grafana.GetVersion(gCtx)
 	if err != nil {
 		io.Error(stdout, "Grafana version: %s", io.Red(summarizeError(err))+"\n")
-		return
+		return nil
 	}
 
 	if version.Major() < 12 {
-		io.Error(stdout, "Grafana version: %s", io.Red(version.String()+" (Grafana >= 12.0.0 is required)")+"\n")
-		return
+		return &grafana.VersionIncompatibleError{Version: version}
 	}
 
 	io.Success(stdout, "Grafana version: %s", io.Green(version.String())+"\n")
+
+	return nil
 }
 
 func useContextCmd(configOpts *Options) *cobra.Command {
