@@ -28,4 +28,5 @@ List and get information about Grafana datasources.
 * [grafanactl datasources list](grafanactl_datasources_list.md)	 - List all datasources
 * [grafanactl datasources loki](grafanactl_datasources_loki.md)	 - Loki datasource operations
 * [grafanactl datasources prometheus](grafanactl_datasources_prometheus.md)	 - Prometheus datasource operations
+* [grafanactl datasources pyroscope](grafanactl_datasources_pyroscope.md)	 - Pyroscope datasource operations
 

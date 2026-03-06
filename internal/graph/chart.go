@@ -47,7 +47,7 @@ func RenderPercentageBars(w io.Writer, title string, items []PercentageBarItem, 
 	var sb strings.Builder
 
 	if title != "" {
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF"))
+		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00D7FF"))
 		sb.WriteString(titleStyle.Render(title))
 		sb.WriteString("\n\n")
 	}
@@ -182,7 +182,7 @@ func RenderBarChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 		title = data.Title
 	}
 	if title != "" {
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF"))
+		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00D7FF"))
 		sb.WriteString(titleStyle.Render(title))
 		sb.WriteString("\n\n")
 	}
@@ -288,7 +288,7 @@ func RenderLineChart(w io.Writer, data *ChartData, opts ChartOptions) error {
 		title = data.Title
 	}
 	if title != "" {
-		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF"))
+		titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#00D7FF"))
 		sb.WriteString(titleStyle.Render(title))
 		sb.WriteString("\n\n")
 	}

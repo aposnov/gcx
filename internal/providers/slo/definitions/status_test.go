@@ -1,3 +1,4 @@
+//nolint:modernize // new(expr) is not valid Go syntax - linter is wrong
 package definitions_test
 
 import (
@@ -7,6 +8,8 @@ import (
 
 	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 )
+
+func ptrFloat64(v float64) *float64 { return &v }
 
 func TestComputeStatus(t *testing.T) {
 	tests := []struct {
@@ -19,21 +22,21 @@ func TestComputeStatus(t *testing.T) {
 		{
 			name:      "OK when SLI meets objective",
 			slo:       definitions.Slo{},
-			sli:       new(0.999),
+			sli:       ptrFloat64(0.999),
 			objective: 0.995,
 			want:      "OK",
 		},
 		{
 			name:      "OK when SLI equals objective",
 			slo:       definitions.Slo{},
-			sli:       new(0.995),
+			sli:       ptrFloat64(0.995),
 			objective: 0.995,
 			want:      "OK",
 		},
 		{
 			name:      "BREACHING when SLI below objective",
 			slo:       definitions.Slo{},
-			sli:       new(0.990),
+			sli:       ptrFloat64(0.990),
 			objective: 0.995,
 			want:      "BREACHING",
 		},
@@ -62,7 +65,7 @@ func TestComputeStatus(t *testing.T) {
 					Status: &definitions.Status{Type: "error"},
 				},
 			},
-			sli:       new(0.999),
+			sli:       ptrFloat64(0.999),
 			objective: 0.995,
 			want:      "Error",
 		},
@@ -73,7 +76,7 @@ func TestComputeStatus(t *testing.T) {
 					Status: &definitions.Status{Type: "running"},
 				},
 			},
-			sli:       new(0.999),
+			sli:       ptrFloat64(0.999),
 			objective: 0.995,
 			want:      "OK",
 		},
@@ -147,8 +150,8 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 			UUID:      "abc123def",
 			Objective: 0.995,
 			Window:    "28d",
-			SLI:       new(0.9972),
-			Budget:    new(0.44),
+			SLI:       ptrFloat64(0.9972),
+			Budget:    ptrFloat64(0.44),
 			Status:    "OK",
 		},
 		{
@@ -156,8 +159,8 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 			UUID:      "xyz789ghi",
 			Objective: 0.999,
 			Window:    "28d",
-			SLI:       new(0.9985),
-			Budget:    new(-0.50),
+			SLI:       ptrFloat64(0.9985),
+			Budget:    ptrFloat64(-0.50),
 			Status:    "BREACHING",
 		},
 		{
@@ -221,11 +224,11 @@ func TestStatusTableCodec_Encode(t *testing.T) {
 				UUID:      "abc123def",
 				Objective: 0.995,
 				Window:    "28d",
-				SLI:       new(0.9972),
-				Budget:    new(0.44),
+				SLI:       ptrFloat64(0.9972),
+				Budget:    ptrFloat64(0.44),
 				BurnRate:  &burnRate,
-				SLI1h:     new(0.9991),
-				SLI1d:     new(0.9980),
+				SLI1h:     ptrFloat64(0.9991),
+				SLI1d:     ptrFloat64(0.9980),
 				Status:    "OK",
 			},
 		}
@@ -277,7 +280,7 @@ func TestBuildStatusResults(t *testing.T) {
 
 	burnRate := 2.0
 	metrics := map[string]definitions.MetricData{
-		"uuid-1": {SLI: new(0.9972), BurnRate: &burnRate},
+		"uuid-1": {SLI: ptrFloat64(0.9972), BurnRate: &burnRate},
 	}
 
 	results := definitions.BuildStatusResults(slos, metrics)

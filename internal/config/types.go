@@ -60,6 +60,9 @@ type Context struct {
 	// DefaultLokiDatasource is the UID of the default Loki datasource to use for queries.
 	DefaultLokiDatasource string `json:"default-loki-datasource,omitempty" yaml:"default-loki-datasource,omitempty"`
 
+	// DefaultPyroscopeDatasource is the UID of the default Pyroscope datasource to use for queries.
+	DefaultPyroscopeDatasource string `json:"default-pyroscope-datasource,omitempty" yaml:"default-pyroscope-datasource,omitempty"`
+
 	// Providers holds per-provider configuration, indexed by provider name.
 	// Each provider has a map of string key-value pairs.
 	// Secret fields are selectively redacted by providers.RedactSecrets using

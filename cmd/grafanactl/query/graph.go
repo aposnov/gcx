@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/grafanactl/internal/graph"
 	"github.com/grafana/grafanactl/internal/query/loki"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
+	"github.com/grafana/grafanactl/internal/query/pyroscope"
 )
 
 type queryGraphCodec struct{}
@@ -31,8 +32,13 @@ func (c *queryGraphCodec) Encode(w io.Writer, data any) error {
 		if err != nil {
 			return err
 		}
+	case *pyroscope.QueryResponse:
+		chartData, err = graph.FromPyroscopeResponse(resp)
+		if err != nil {
+			return err
+		}
 	default:
-		return errors.New("invalid data type for graph codec (expected *prometheus.QueryResponse or *loki.QueryResponse)")
+		return errors.New("invalid data type for graph codec (expected *prometheus.QueryResponse, *loki.QueryResponse, or *pyroscope.QueryResponse)")
 	}
 
 	opts := graph.DefaultChartOptions()

@@ -1,3 +1,4 @@
+//nolint:modernize // new(expr) is not valid Go syntax - linter is wrong
 package reports_test
 
 import (
@@ -8,6 +9,8 @@ import (
 	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 	"github.com/grafana/grafanactl/internal/providers/slo/reports"
 )
+
+func ptrFloat64(v float64) *float64 { return &v }
 
 func TestBuildReportStatusResults(t *testing.T) {
 	rpts := []reports.Report{
@@ -30,8 +33,8 @@ func TestBuildReportStatusResults(t *testing.T) {
 	}
 
 	sloResultIndex := map[string]definitions.StatusResult{
-		"slo-1": {Name: "payment-api-latency", UUID: "slo-1", Objective: 0.995, Window: "28d", SLI: new(0.9972), Budget: new(0.44), Status: "OK"},
-		"slo-2": {Name: "checkout-avail", UUID: "slo-2", Objective: 0.999, Window: "28d", SLI: new(0.9985), Budget: new(-0.50), Status: "BREACHING"},
+		"slo-1": {Name: "payment-api-latency", UUID: "slo-1", Objective: 0.995, Window: "28d", SLI: ptrFloat64(0.9972), Budget: ptrFloat64(0.44), Status: "OK"},
+		"slo-2": {Name: "checkout-avail", UUID: "slo-2", Objective: 0.999, Window: "28d", SLI: ptrFloat64(0.9985), Budget: ptrFloat64(-0.50), Status: "BREACHING"},
 	}
 
 	results := reports.BuildReportStatusResults(rpts, sloIndex, sloResultIndex)
@@ -122,7 +125,7 @@ func TestBuildReportStatusResults_LifecycleStatus(t *testing.T) {
 	}
 
 	sloResultIndex := map[string]definitions.StatusResult{
-		"slo-1": {Name: "healthy-slo", UUID: "slo-1", Objective: 0.995, SLI: new(0.999), Status: "OK"},
+		"slo-1": {Name: "healthy-slo", UUID: "slo-1", Objective: 0.995, SLI: ptrFloat64(0.999), Status: "OK"},
 		"slo-2": {Name: "creating-slo", UUID: "slo-2", Status: "Creating"},
 	}
 
@@ -140,12 +143,12 @@ func TestReportStatusTableCodec_Encode(t *testing.T) {
 			UUID:           "rpt-1",
 			TimeSpan:       "weekly",
 			SLOCount:       3,
-			CombinedSLI:    new(0.9982),
-			CombinedBudget: new(0.36),
+			CombinedSLI:    ptrFloat64(0.9982),
+			CombinedBudget: ptrFloat64(0.36),
 			Status:         "OK",
 			SLOs: []definitions.StatusResult{
-				{Name: "payment-api-latency", SLI: new(0.9972), Budget: new(0.44), Status: "OK"},
-				{Name: "checkout-avail", SLI: new(0.9985), Budget: new(-0.50), Status: "BREACHING"},
+				{Name: "payment-api-latency", SLI: ptrFloat64(0.9972), Budget: ptrFloat64(0.44), Status: "OK"},
+				{Name: "checkout-avail", SLI: ptrFloat64(0.9985), Budget: ptrFloat64(-0.50), Status: "BREACHING"},
 			},
 		},
 	}

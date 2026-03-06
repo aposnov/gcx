@@ -11,18 +11,21 @@ import (
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/query/loki"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
+	"github.com/grafana/grafanactl/internal/query/pyroscope"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 type queryOpts struct {
-	IO         cmdio.Options
-	Datasource string
-	Type       string
-	Query      string
-	Start      string
-	End        string
-	Step       string
+	IO          cmdio.Options
+	Datasource  string
+	Type        string
+	Query       string
+	Start       string
+	End         string
+	Step        string
+	ProfileType string // Pyroscope-specific
+	MaxNodes    int64  // Pyroscope-specific
 }
 
 func (opts *queryOpts) setup(flags *pflag.FlagSet) {
@@ -31,12 +34,14 @@ func (opts *queryOpts) setup(flags *pflag.FlagSet) {
 	opts.IO.DefaultFormat("table")
 	opts.IO.BindFlags(flags)
 
-	flags.StringVarP(&opts.Datasource, "datasource", "d", "", "Datasource UID (required unless default-prometheus-datasource is configured)")
-	flags.StringVarP(&opts.Type, "type", "t", "prometheus", "Datasource type (prometheus, loki)")
-	flags.StringVarP(&opts.Query, "expr", "e", "", "Query expression (PromQL for prometheus, LogQL for loki)")
+	flags.StringVarP(&opts.Datasource, "datasource", "d", "", "Datasource UID (required unless default-{type}-datasource is configured)")
+	flags.StringVarP(&opts.Type, "type", "t", "prometheus", "Datasource type (prometheus, loki, pyroscope)")
+	flags.StringVarP(&opts.Query, "expr", "e", "", "Query expression (PromQL for prometheus, LogQL for loki, label selector for pyroscope)")
 	flags.StringVar(&opts.Start, "start", "", "Start time (RFC3339, Unix timestamp, or relative like 'now-1h')")
 	flags.StringVar(&opts.End, "end", "", "End time (RFC3339, Unix timestamp, or relative like 'now')")
 	flags.StringVar(&opts.Step, "step", "", "Query step (e.g., '15s', '1m')")
+	flags.StringVar(&opts.ProfileType, "profile-type", "", "Profile type ID for pyroscope queries (e.g., 'process_cpu:cpu:nanoseconds:cpu:nanoseconds')")
+	flags.Int64Var(&opts.MaxNodes, "max-nodes", 1024, "Maximum nodes in flame graph (pyroscope only)")
 }
 
 func (opts *queryOpts) Validate() error {
@@ -46,6 +51,10 @@ func (opts *queryOpts) Validate() error {
 
 	if opts.Query == "" {
 		return errors.New("query expression is required (use -e or --expr)")
+	}
+
+	if opts.Type == "pyroscope" && opts.ProfileType == "" {
+		return errors.New("profile type is required for pyroscope queries (use --profile-type)")
 	}
 
 	return nil
@@ -79,6 +88,9 @@ func Command() *cobra.Command {
 	# Loki metric query (log rate)
 	grafanactl query -d <loki-uid> -t loki -e 'sum(rate({job="varlogs"}[5m]))' --start now-1h --end now --step 1m
 
+	# Pyroscope profile query (requires --profile-type)
+	grafanactl query -d <pyroscope-uid> -t pyroscope -e '{service_name="frontend"}' --profile-type process_cpu:cpu:nanoseconds:cpu:nanoseconds --start now-1h --end now
+
 	# Output as JSON
 	grafanactl query -d <datasource-uid> -e 'up' -o json`,
 		Args: cobra.NoArgs,
@@ -101,9 +113,12 @@ func Command() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				if opts.Type == "loki" {
+				switch opts.Type {
+				case "loki":
 					datasourceUID = fullCfg.GetCurrentContext().DefaultLokiDatasource
-				} else {
+				case "pyroscope":
+					datasourceUID = fullCfg.GetCurrentContext().DefaultPyroscopeDatasource
+				default:
 					datasourceUID = fullCfg.GetCurrentContext().DefaultPrometheusDatasource
 				}
 			}
@@ -177,8 +192,32 @@ func Command() *cobra.Command {
 
 				return opts.IO.Encode(cmd.OutOrStdout(), resp)
 
+			case "pyroscope":
+				client, err := pyroscope.NewClient(cfg)
+				if err != nil {
+					return fmt.Errorf("failed to create client: %w", err)
+				}
+
+				req := pyroscope.QueryRequest{
+					LabelSelector: opts.Query,
+					ProfileTypeID: opts.ProfileType,
+					Start:         start,
+					End:           end,
+					MaxNodes:      opts.MaxNodes,
+				}
+
+				resp, err := client.Query(ctx, datasourceUID, req)
+				if err != nil {
+					return fmt.Errorf("query failed: %w", err)
+				}
+
+				if opts.IO.OutputFormat == "table" {
+					return pyroscope.FormatQueryTable(cmd.OutOrStdout(), resp)
+				}
+				return opts.IO.Encode(cmd.OutOrStdout(), resp)
+
 			default:
-				return fmt.Errorf("datasource type %q is not supported (supported: prometheus, loki)", opts.Type)
+				return fmt.Errorf("datasource type %q is not supported (supported: prometheus, loki, pyroscope)", opts.Type)
 			}
 		},
 	}
@@ -196,12 +235,16 @@ func (c *queryTableCodec) Format() format.Format {
 }
 
 func (c *queryTableCodec) Encode(w io.Writer, data any) error {
-	resp, ok := data.(*prometheus.QueryResponse)
-	if !ok {
+	switch resp := data.(type) {
+	case *prometheus.QueryResponse:
+		return prometheus.FormatTable(w, resp)
+	case *loki.QueryResponse:
+		return loki.FormatQueryTable(w, resp)
+	case *pyroscope.QueryResponse:
+		return pyroscope.FormatQueryTable(w, resp)
+	default:
 		return errors.New("invalid data type for query table codec")
 	}
-
-	return prometheus.FormatTable(w, resp)
 }
 
 func (c *queryTableCodec) Decode(io.Reader, any) error {

@@ -1,0 +1,246 @@
+package pyroscope
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/grafana/grafanactl/internal/config"
+	"k8s.io/client-go/rest"
+)
+
+// Client is a client for executing Pyroscope queries via Grafana's datasource API.
+type Client struct {
+	restConfig config.NamespacedRESTConfig
+	httpClient *http.Client
+}
+
+// NewClient creates a new Pyroscope query client.
+func NewClient(cfg config.NamespacedRESTConfig) (*Client, error) {
+	httpClient, err := rest.HTTPClientFor(&cfg.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	return &Client{
+		restConfig: cfg,
+		httpClient: httpClient,
+	}, nil
+}
+
+// Query executes a Pyroscope profile query against the specified datasource.
+func (c *Client) Query(ctx context.Context, datasourceUID string, req QueryRequest) (*QueryResponse, error) {
+	apiPath := c.buildResourcePath(datasourceUID, "querier.v1.QuerierService/SelectMergeStacktraces")
+
+	start, end := defaultTimeRange(req.Start, req.End)
+
+	// Build request body
+	bodyMap := map[string]any{
+		"labelSelector": req.LabelSelector,
+		"profileTypeID": req.ProfileTypeID,
+		"start":         strconv.FormatInt(start.UnixMilli(), 10),
+		"end":           strconv.FormatInt(end.UnixMilli(), 10),
+	}
+
+	if req.MaxNodes > 0 {
+		bodyMap["maxNodes"] = strconv.FormatInt(req.MaxNodes, 10)
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.restConfig.Host+apiPath, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result QueryResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// ProfileTypes returns available profile types from the datasource.
+func (c *Client) ProfileTypes(ctx context.Context, datasourceUID string, req ProfileTypesRequest) (*ProfileTypesResponse, error) {
+	apiPath := c.buildResourcePath(datasourceUID, "querier.v1.QuerierService/ProfileTypes")
+
+	start, end := defaultTimeRange(req.Start, req.End)
+
+	bodyMap := map[string]any{
+		"start": strconv.FormatInt(start.UnixMilli(), 10),
+		"end":   strconv.FormatInt(end.UnixMilli(), 10),
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.restConfig.Host+apiPath, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get profile types: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("profile types query failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result ProfileTypesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// LabelNames returns label names from the datasource.
+func (c *Client) LabelNames(ctx context.Context, datasourceUID string, req LabelNamesRequest) (*LabelNamesResponse, error) {
+	apiPath := c.buildResourcePath(datasourceUID, "querier.v1.QuerierService/LabelNames")
+
+	start, end := defaultTimeRange(req.Start, req.End)
+
+	bodyMap := map[string]any{
+		"start": strconv.FormatInt(start.UnixMilli(), 10),
+		"end":   strconv.FormatInt(end.UnixMilli(), 10),
+	}
+	if len(req.Matchers) > 0 {
+		bodyMap["matchers"] = req.Matchers
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.restConfig.Host+apiPath, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get label names: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("label names query failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result LabelNamesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// LabelValues returns values for a specific label.
+func (c *Client) LabelValues(ctx context.Context, datasourceUID string, req LabelValuesRequest) (*LabelValuesResponse, error) {
+	apiPath := c.buildResourcePath(datasourceUID, "querier.v1.QuerierService/LabelValues")
+
+	start, end := defaultTimeRange(req.Start, req.End)
+
+	bodyMap := map[string]any{
+		"name":  req.Name,
+		"start": strconv.FormatInt(start.UnixMilli(), 10),
+		"end":   strconv.FormatInt(end.UnixMilli(), 10),
+	}
+	if len(req.Matchers) > 0 {
+		bodyMap["matchers"] = req.Matchers
+	}
+
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.restConfig.Host+apiPath, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get label values: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("label values query failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result LabelValuesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (c *Client) buildResourcePath(datasourceUID, resourcePath string) string {
+	return fmt.Sprintf("/api/datasources/proxy/uid/%s/%s",
+		datasourceUID, resourcePath)
+}
+
+// defaultTimeRange returns the provided time range, or defaults to the last hour if not set.
+func defaultTimeRange(start, end time.Time) (time.Time, time.Time) {
+	if start.IsZero() || end.IsZero() {
+		end = time.Now()
+		start = end.Add(-1 * time.Hour)
+	}
+	return start, end
+}
