@@ -1,4 +1,5 @@
 /.devbox
+/.worktrees
 /build
 /bin
 /vendor
