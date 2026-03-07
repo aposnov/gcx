@@ -12,3 +12,4 @@
 # Integration testing artifacts
 test-dashboard.yaml
 test-*.yaml
+.env

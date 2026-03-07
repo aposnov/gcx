@@ -18,6 +18,7 @@ grafanactl/
 │       └── io/               # Output formatting, user-facing messages
 │
 ├── internal/                 # All non-public packages (Go enforced)
+│   ├── agent/                # Agent-mode detection (env vars + --agent flag)
 │   ├── config/               # Config loading, context management, auth types
 │   │   └── testdata/         # YAML fixtures for config unit tests
 │   ├── format/               # JSON/YAML codec, format auto-detection
@@ -31,9 +32,13 @@ grafanactl/
 │   ├── providers/            # Provider plugin system
 │   │   ├── configloader.go   # Shared ConfigLoader for all providers
 │   │   ├── alert/            # Alert provider (rules and groups)
-│   │   └── slo/              # SLO provider implementation
-│   │       ├── definitions/  # SLO definitions and status queries
-│   │       └── reports/      # SLO reports
+│   │   ├── slo/              # SLO provider implementation
+│   │   │   ├── definitions/  # SLO definitions and status queries
+│   │   │   └── reports/      # SLO reports
+│   │   └── synth/            # Synthetic Monitoring provider
+│   │       ├── checks/       # Checks status, timeline, CRUD
+│   │       ├── probes/       # Probe listing
+│   │       └── smcfg/        # SM config loader interfaces
 │   ├── query/                # Datasource query clients
 │   │   ├── prometheus/       # Prometheus HTTP client (instant + range queries)
 │   │   └── loki/             # Loki HTTP client (log + metric queries)

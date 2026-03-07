@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/grafanactl/internal/query/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
 )
 
 // ReportStatusResult holds aggregated health data for a single report.
@@ -90,19 +91,33 @@ metrics, and computes combined SLI and error budget per report.`,
 				return err
 			}
 
-			// Fetch report(s).
-			var reports []Report
-			if len(args) == 1 {
-				r, err := reportClient.Get(ctx, args[0])
-				if err != nil {
-					return err
+			// Fetch reports and all SLO definitions in parallel.
+			var (
+				reports []Report
+				allSLOs []definitions.Slo
+			)
+
+			initG, initCtx := errgroup.WithContext(ctx)
+			initG.Go(func() error {
+				if len(args) == 1 {
+					r, err := reportClient.Get(initCtx, args[0])
+					if err != nil {
+						return err
+					}
+					reports = []Report{*r}
+					return nil
 				}
-				reports = []Report{*r}
-			} else {
-				reports, err = reportClient.List(ctx)
-				if err != nil {
-					return err
-				}
+				var err error
+				reports, err = reportClient.List(initCtx)
+				return err
+			})
+			initG.Go(func() error {
+				var err error
+				allSLOs, err = sloClient.List(initCtx)
+				return err
+			})
+			if err := initG.Wait(); err != nil {
+				return err
 			}
 
 			if len(reports) == 0 {
@@ -118,11 +133,7 @@ metrics, and computes combined SLI and error budget per report.`,
 				}
 			}
 
-			// Fetch all SLO definitions and index by UUID.
-			allSLOs, err := sloClient.List(ctx)
-			if err != nil {
-				return err
-			}
+			// Index SLO definitions by UUID.
 			sloIndex := make(map[string]definitions.Slo, len(allSLOs))
 			for _, s := range allSLOs {
 				sloIndex[s.UUID] = s

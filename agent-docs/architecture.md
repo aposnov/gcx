@@ -39,6 +39,7 @@
 |  CLI Layer (cmd/grafanactl/)                                 |
 |  - Cobra commands, flag parsing, output formatting           |
 |  - No business logic; only wiring and user interaction       |
+|  - internal/agent: agent-mode detection (env vars + --agent) |
 +-------------------------------------------------------------+
          |                    |                    |
          v                    v                    v
@@ -601,6 +602,12 @@ Files most important for understanding the codebase. Organized by architectural 
 | `internal/config/editor.go` | SetValue/UnsetValue (reflection-based config editing) |
 | `internal/config/errors.go` | ValidationError, UnmarshalError, ContextNotFound |
 | `internal/secrets/redactor.go` | Reflection-based secret redaction |
+
+### Agent Mode
+
+| File | Purpose |
+|------|---------|
+| `internal/agent/agent.go` | `IsAgentMode()`, `SetFlag()` — env-var detection at init time |
 
 ### Client Layer
 

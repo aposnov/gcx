@@ -1,0 +1,29 @@
+## grafanactl synth checks push
+
+Push Synthetic Monitoring checks from files.
+
+```
+grafanactl synth checks push FILE... [flags]
+```
+
+### Options
+
+```
+      --dry-run   Preview changes without applying them
+  -h, --help      help for push
+```
+
+### Options inherited from parent commands
+
+```
+      --agent            Enable agent mode (JSON output, no color). Auto-detected from CLAUDE_CODE, CURSOR_AGENT, GITHUB_COPILOT, AMAZON_Q, or GRAFANACTL_AGENT_MODE env vars.
+      --config string    Path to the configuration file to use
+      --context string   Name of the context to use
+      --no-color         Disable color output
+  -v, --verbose count    Verbose mode. Multiple -v options increase the verbosity (maximum: 3).
+```
+
+### SEE ALSO
+
+* [grafanactl synth checks](grafanactl_synth_checks.md)	 - Manage Synthetic Monitoring checks.
+

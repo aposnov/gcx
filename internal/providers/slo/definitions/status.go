@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"text/tabwriter"
 
 	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
@@ -17,6 +18,7 @@ import (
 	"github.com/grafana/promql-builder/go/promql"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
 )
 
 const uuidLabel = "grafana_slo_uuid"
@@ -223,6 +225,8 @@ func FetchMetrics(ctx context.Context, client *prometheus.Client, slos []Slo) ma
 		groups[dsUID] = append(groups[dsUID], s)
 	}
 
+	var mu sync.Mutex
+
 	for dsUID, groupSlos := range groups {
 		if dsUID == "" {
 			continue // Skip SLOs with no destination datasource.
@@ -234,27 +238,46 @@ func FetchMetrics(ctx context.Context, client *prometheus.Client, slos []Slo) ma
 		}
 		uuidRegex := strings.Join(uuids, "|")
 
-		// Fetch SLI window values.
-		if q, err := BuildMetricQuery("grafana_slo_sli_window", uuidRegex); err == nil {
-			mergeQuery(ctx, client, dsUID, q, result,
-				func(m *MetricData, val *float64) { m.SLI = val })
+		type querySpec struct {
+			query  string
+			setter func(*MetricData, *float64)
 		}
 
-		// Fetch 1h and 1d SLI values.
+		specs := make([]querySpec, 0, 4)
+		if q, err := BuildMetricQuery("grafana_slo_sli_window", uuidRegex); err == nil {
+			specs = append(specs, querySpec{q, func(m *MetricData, val *float64) { m.SLI = val }})
+		}
 		if q, err := BuildMetricQuery("grafana_slo_sli_1h", uuidRegex); err == nil {
-			mergeQuery(ctx, client, dsUID, q, result,
-				func(m *MetricData, val *float64) { m.SLI1h = val })
+			specs = append(specs, querySpec{q, func(m *MetricData, val *float64) { m.SLI1h = val }})
 		}
 		if q, err := BuildMetricQuery("grafana_slo_sli_1d", uuidRegex); err == nil {
-			mergeQuery(ctx, client, dsUID, q, result,
-				func(m *MetricData, val *float64) { m.SLI1d = val })
+			specs = append(specs, querySpec{q, func(m *MetricData, val *float64) { m.SLI1d = val }})
+		}
+		if q, err := BuildBurnRateQuery(uuidRegex); err == nil {
+			specs = append(specs, querySpec{q, func(m *MetricData, val *float64) { m.BurnRate = val }})
 		}
 
-		// Fetch burn rate for ratio-based SLOs (non-ratio SLOs will naturally yield no data).
-		if q, err := BuildBurnRateQuery(uuidRegex); err == nil {
-			mergeQuery(ctx, client, dsUID, q, result,
-				func(m *MetricData, val *float64) { m.BurnRate = val })
+		g, gCtx := errgroup.WithContext(ctx)
+		for _, spec := range specs {
+			g.Go(func() error {
+				resp := queryMetric(gCtx, client, dsUID, spec.query)
+				if resp == nil {
+					return nil
+				}
+				mu.Lock()
+				for _, sample := range resp.Data.Result {
+					uuid := sample.Metric[uuidLabel]
+					if val := parseSampleValue(sample); val != nil {
+						m := result[uuid]
+						spec.setter(&m, val)
+						result[uuid] = m
+					}
+				}
+				mu.Unlock()
+				return nil
+			})
 		}
+		_ = g.Wait() // errors are handled gracefully (NODATA)
 	}
 
 	return result
@@ -307,29 +330,6 @@ func BuildBurnRateQuery(uuidRegex string) (string, error) {
 		return "", err
 	}
 	return expr.String(), nil
-}
-
-// mergeQuery executes a raw PromQL query and merges its values into the result map.
-func mergeQuery(
-	ctx context.Context, client *prometheus.Client,
-	dsUID, query string,
-	result map[string]MetricData,
-	setter func(m *MetricData, val *float64),
-) {
-	resp := queryMetric(ctx, client, dsUID, query)
-	if resp == nil {
-		return
-	}
-
-	for _, sample := range resp.Data.Result {
-		uuid := sample.Metric["grafana_slo_uuid"]
-		val := parseSampleValue(sample)
-		if val != nil {
-			m := result[uuid]
-			setter(&m, val)
-			result[uuid] = m
-		}
-	}
 }
 
 // queryMetric executes an instant PromQL query and returns the response.

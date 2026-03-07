@@ -326,6 +326,36 @@ Cross-reference: Pattern 12 (Direct HTTP Client for Datasource APIs).
 
 ---
 
+### 15. Agent Mode Detection (High Confidence: 94%)
+
+grafanactl detects at startup whether it is running inside an AI agent
+environment (Claude Code, Cursor, GitHub Copilot, Amazon Q) and adjusts
+its behavior accordingly — primarily disabling color output. Detection
+happens at `init()` time by reading well-known environment variables;
+the `--agent` CLI flag overrides env detection when explicitly set.
+
+**Detection priority:**
+
+| Priority | Mechanism | Notes |
+|----------|-----------|-------|
+| 1 | `GRAFANACTL_AGENT_MODE` env var | Explicit override — falsy value disables agent mode even if other vars are set |
+| 2 | `CLAUDE_CODE`, `CURSOR_AGENT`, `GITHUB_COPILOT`, `AMAZON_Q` env vars | Any truthy value enables agent mode |
+| 3 | `--agent` CLI flag | Applied after env detection; always takes precedence when explicitly passed |
+
+**Behavioral effects when agent mode is active:**
+- Color output disabled globally (`color.NoColor = true`)
+- Exit codes and output format are unchanged (use `-o json` explicitly for machine-readable output)
+
+**Key files:**
+- `internal/agent/agent.go` — `IsAgentMode()`, `SetFlag()`, `DetectedFromEnv()`
+- `cmd/grafanactl/root/command.go` — checks `agent.IsAgentMode()` in `PersistentPreRun`, wires `--agent` flag
+
+**Evidence:**
+- `internal/agent/` package with `init()`-time env-var detection
+- Root command `PersistentPreRun` calls `color.NoColor = true` when `IsAgentMode()` returns true
+
+---
+
 ## Contradiction Resolutions
 
 ### 1. DiscoverStackID Called Twice

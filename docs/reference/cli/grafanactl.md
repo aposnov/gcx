@@ -23,4 +23,5 @@
 * [grafanactl query](grafanactl_query.md)	 - Execute queries against Grafana datasources
 * [grafanactl resources](grafanactl_resources.md)	 - Manipulate Grafana resources
 * [grafanactl slo](grafanactl_slo.md)	 - Manage Grafana SLO resources.
+* [grafanactl synth](grafanactl_synth.md)	 - Manage Grafana Synthetic Monitoring resources.
 

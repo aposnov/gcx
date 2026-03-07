@@ -402,6 +402,7 @@ UX requirements. All items are `[ADOPT]` unless marked otherwise.
 
 - [ ] All data-display commands support `-o json/yaml` (inherited from `io.Options`)
 - [ ] List/get commands register a `text` table codec as default format
+- [ ] List/get commands register a `wide` codec showing additional detail columns
 - [ ] Error messages include actionable suggestions with exact CLI commands
 - [ ] No `os.Exit()` calls in command code — return errors, let `handleError` exit
 - [ ] Status messages use `cmdio.Success/Warning/Error/Info`

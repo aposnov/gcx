@@ -213,6 +213,14 @@ Present your brainstormed list to the user via AskUserQuestion:
 actually found — real API endpoints, real data available. Don't propose commands
 that would require APIs that don't exist.
 
+**Performance patterns for status/timeline commands:**
+- **Aggregate queries** — prefer PromQL with `by (label1, label2)` over
+  per-resource queries when showing status for many resources
+- **Parallelism** — use `errgroup` for concurrent data fetching (config load,
+  resource list, metric queries)
+- **Caching** — if a command discovers configuration at runtime (e.g.,
+  datasource UID), consider caching it in provider config for subsequent runs
+
 ### Decision 5: Package Layout (Section 2.5)
 
 Convention (from SLO reference implementation):
@@ -258,6 +266,10 @@ Common stage sequence:
 3. Status/monitoring (~350 LOC)
 4. Advanced features (graph, timeline, etc.)
 
+**Every stage design doc MUST include a Verification section** with concrete
+smoke-test commands using `source .env` or `grafanactl config` values. Do not
+defer verification planning to implementation time.
+
 ### Gate: Design Complete
 
 Write a top-level plan doc in `docs/designs/{provider}/` capturing all
@@ -272,7 +284,11 @@ stage. **Get user approval before implementing.** The SLO plan is the template:
 > **Guide**: `agent-docs/provider-guide.md` — follow Steps 1–7
 > **UX Guide**: `agent-docs/design-guide.md` — comply with all [CURRENT] and [ADOPT] items
 
-Implement one stage at a time. For each stage:
+Implement one stage at a time. Consider splitting work across sessions per stage
+to avoid context overflow — each stage's design doc is self-contained enough to
+resume in a fresh session.
+
+For each stage:
 
 ### Step 1: Provider Interface (`provider-guide.md` Step 1)
 
@@ -310,6 +326,8 @@ and validation. Don't simplify it; the full implementation is required.
 
 - **ConfigKeys**: Declare all keys. `Secret: true` for tokens. SLO uses `[]`
   (reuses `grafana.token`) — most plugin API providers can do the same.
+  Config key names use **hyphen-case** (`my-url`, `my-token`), not
+  underscore_case. Error messages must match the config key format exactly.
 - **Validate**: Return actionable errors pointing to `grafanactl config set ...`.
 
 ### Step 4: Commands (`provider-guide.md` Step 4)
@@ -374,9 +392,7 @@ Write contract tests for the provider interface + unit tests for each component:
 ### Gate: Stage Complete
 
 ```bash
-make build    # Binary compiles
-make tests    # All tests pass with race detection
-make lint     # No lint errors
+make all               # lint + tests + build + docs
 grafanactl providers   # New provider listed
 grafanactl config view # Secrets redacted correctly
 ```
@@ -410,18 +426,21 @@ Run through both checklists:
 - [ ] PromQL uses `promql-builder` (if applicable)
 
 ### Build Verification
-- [ ] `make build` succeeds
-- [ ] `make tests` passes
-- [ ] `make lint` passes
+- [ ] `make all` succeeds (lint + tests + build + docs)
 - [ ] `grafanactl providers` lists the new provider
 - [ ] `grafanactl config view` redacts secrets
+- [ ] Run `/update-agent-docs` to capture new patterns/architecture
 
 ---
 
-## Reference Implementation
+## Reference Implementations
 
-The SLO provider was built as the Wave 1 reference implementation (PR #13).
-Key files:
+Two providers serve as reference implementations, demonstrating different
+auth models and API types.
+
+### SLO Provider (Wave 1, PR #13)
+
+Uses the same Grafana SA token and a plugin API. Key files:
 
 | Component | Path |
 |-----------|------|
@@ -436,6 +455,23 @@ Key files:
 | Top-level plan | `docs/designs/slo-provider/2026-03-04-slo-provider-plan.md` |
 | Stage 1 design | `docs/designs/slo-provider/1-slo-definitions-crud/` |
 | Stage 2 design | `docs/designs/slo-provider/2-reports-crud/` |
+
+### Synth Monitoring Provider (Wave 2)
+
+Uses a separate URL + token and an external service API. Key files:
+
+| Component | Path |
+|-----------|------|
+| Provider struct + configLoader | `internal/providers/synth/provider.go` |
+| Shared config interfaces | `internal/providers/synth/smcfg/loader.go` |
+| Checks commands | `internal/providers/synth/checks/commands.go` |
+| Status (Prometheus hybrid) | `internal/providers/synth/checks/status.go` |
+| Probes commands | `internal/providers/synth/probes/commands.go` |
+| Top-level plan | `docs/designs/synth-provider/2026-03-06-synth-provider-plan.md` |
+| Stage 1 design | `docs/designs/synth-provider/1-checks-probes-crud/` |
+| Stage 2 design | `docs/designs/synth-provider/2-checks-status/` |
+
+### Lessons Learned
 
 **What the SLO commit taught us** (from the actual implementation experience):
 - Design docs were produced for each stage before coding began — the plan
