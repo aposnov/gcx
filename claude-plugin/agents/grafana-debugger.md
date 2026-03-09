@@ -288,10 +288,12 @@ grafanactl datasources list -o json
 
 Expected output shape:
 ```json
-[
-  {"uid": "<prom-uid>", "name": "<name>", "type": "prometheus"},
-  {"uid": "<loki-uid>", "name": "<name>", "type": "loki"}
-]
+{
+  "datasources": [
+    {"uid": "<prom-uid>", "name": "<name>", "type": "prometheus"},
+    {"uid": "<loki-uid>", "name": "<name>", "type": "loki"}
+  ]
+}
 ```
 
 Extract the UID values. All subsequent queries use `-d <uid>`, never display
