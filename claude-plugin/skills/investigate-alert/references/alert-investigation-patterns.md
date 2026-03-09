@@ -85,6 +85,18 @@ grafanactl alert rules list -o json | \
 
 ---
 
+## JSON Response Envelopes
+
+Quick reference for `-o json` output to avoid jq guessing:
+
+| Command | Envelope | jq Access Pattern |
+|---------|----------|-------------------|
+| `alert rules list` | `[{name, rules: [...]}]` | `.[] \| .rules[]` |
+| `datasources list` | `{"datasources": [...]}` | `.datasources[]` |
+| `query` (Prometheus) | `{"status", "data": {"resultType", "result": [...]}}` | `.data.result[]` |
+
+---
+
 ## Common Investigation Query Patterns
 
 ### Latency Alerts
@@ -94,11 +106,11 @@ For P99/P95 latency alerts:
 ```bash
 # Current latency percentiles
 grafanactl query -d <uid> -e 'histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))' \
-  --start now-1h --end now --step 1m -o graph
+  --from now-1h --to now --step 1m -o graph
 
 # Latency by endpoint
 grafanactl query -d <uid> -e 'histogram_quantile(0.99, sum by(job, handler) (rate(http_request_duration_seconds_bucket[5m])))' \
-  --start now-1h --end now --step 1m -o json
+  --from now-1h --to now --step 1m -o json
 ```
 
 ### Error Rate Alerts
@@ -108,11 +120,11 @@ For alerts on HTTP 5xx or error rates:
 ```bash
 # Overall error rate
 grafanactl query -d <uid> -e 'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])' \
-  --start now-1h --end now --step 1m -o graph
+  --from now-1h --to now --step 1m -o graph
 
 # Error rate by service
 grafanactl query -d <uid> -e 'sum by(job) (rate(http_requests_total{status=~"5.."}[5m])) / sum by(job) (rate(http_requests_total[5m]))' \
-  --start now-1h --end now --step 1m -o json
+  --from now-1h --to now --step 1m -o json
 ```
 
 ### Resource Exhaustion Alerts
@@ -122,15 +134,15 @@ For CPU, memory, or disk alerts:
 ```bash
 # CPU usage by pod
 grafanactl query -d <uid> -e 'sum by(pod) (rate(container_cpu_usage_seconds_total[5m]))' \
-  --start now-1h --end now --step 1m -o graph
+  --from now-1h --to now --step 1m -o graph
 
 # Memory usage
 grafanactl query -d <uid> -e 'container_memory_working_set_bytes{container!=""}' \
-  --start now-30m --end now --step 1m -o json
+  --from now-30m --to now --step 1m -o json
 
 # Disk free percentage
 grafanactl query -d <uid> -e 'node_filesystem_avail_bytes / node_filesystem_size_bytes' \
-  --start now-6h --end now --step 5m -o graph
+  --from now-6h --to now --step 5m -o graph
 ```
 
 ### Certificate / TLS Alerts
@@ -140,7 +152,7 @@ For cert expiry alerts:
 ```bash
 # Days until certificate expiry
 grafanactl query -d <uid> -e '(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400' \
-  --start now-1h --end now --step 10m -o json
+  --from now-1h --to now --step 10m -o json
 ```
 
 ### Availability / SLO Alerts
@@ -150,11 +162,11 @@ For availability or SLO breach alerts:
 ```bash
 # Uptime over last hour
 grafanactl query -d <uid> -e 'avg_over_time(up[1h])' \
-  --start now-6h --end now --step 5m -o graph
+  --from now-6h --to now --step 5m -o graph
 
 # Current up/down status
 grafanactl query -d <uid> -e 'up == 0' \
-  --start now-15m --end now --step 1m -o json
+  --from now-15m --to now --step 1m -o json
 ```
 
 ---
@@ -166,15 +178,15 @@ After identifying an issue from metrics, correlate with logs:
 ```bash
 # Find error logs for a service
 grafanactl query -d <loki-uid> -e '{job="api-server"} |= "error"' \
-  --start now-1h --end now -o json
+  --from now-1h --to now -o json
 
 # Find logs around the time the alert started firing (replace timestamp)
 grafanactl query -d <loki-uid> -e '{namespace="production"} |= "error"' \
-  --start 2024-01-15T10:00:00Z --end 2024-01-15T10:30:00Z -o json
+  --from 2024-01-15T10:00:00Z --to 2024-01-15T10:30:00Z -o json
 
 # Rate of error log lines (for trend analysis)
 grafanactl query -d <loki-uid> -e 'rate({job="api-server"} |= "error" [5m])' \
-  --start now-2h --end now --step 1m -o graph
+  --from now-2h --to now --step 1m -o graph
 ```
 
 ---
@@ -195,7 +207,7 @@ grafanactl query -d <loki-uid> -e 'rate({job="api-server"} |= "error" [5m])' \
 Use `-o json` after `-o graph` to extract exact values:
 ```bash
 # Get the peak value during the alert window
-grafanactl query -d <uid> -e '<query>' --start now-2h --end now --step 1m -o json | \
+grafanactl query -d <uid> -e '<query>' --from now-2h --to now --step 1m -o json | \
   jq '[.data[].values[] | .value] | max'
 ```
 

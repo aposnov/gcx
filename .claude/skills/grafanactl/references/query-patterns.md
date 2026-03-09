@@ -17,7 +17,7 @@ grafanactl datasources list --type prometheus
 grafanactl datasources list --type loki
 
 # Get JSON for scripting
-DS_UID=$(grafanactl datasources list --type prometheus -o json | jq -r '.[0].uid')
+DS_UID=$(grafanactl datasources list --type prometheus -o json | jq -r '.datasources[0].uid')
 ```
 
 ### Setting Default Datasource
@@ -393,7 +393,7 @@ grafanactl query -d <uid> -e 'up' -o json | jq '.data.result | length'
 
 ```bash
 #!/bin/bash
-DS_UID=$(grafanactl datasources list --type prometheus -o json | jq -r '.[0].uid')
+DS_UID=$(grafanactl datasources list --type prometheus -o json | jq -r '.datasources[0].uid')
 
 # Check if service is up
 UP=$(grafanactl query -d $DS_UID -e 'up{job="critical-service"}' -o json | \

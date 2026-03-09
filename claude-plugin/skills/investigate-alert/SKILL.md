@@ -31,6 +31,11 @@ Fetch the alert by listing all alerts and filtering by name. Replace `<AlertName
 grafanactl alert rules list -o json | jq -r '.[] | .rules[]? | select(.name == "<AlertName>")'
 ```
 
+Server-side filters (use instead of downloading all rules and filtering with jq):
+- `--state firing|pending|inactive` — filter by rule state
+- `--group <name>` — filter by group name
+- `--folder <uid>` — filter by folder UID
+
 Filter by name, state, cluster/environment as relevant. If multiple matches, list them and ask which to investigate.
 Inform the user which context you're using.
 
@@ -45,16 +50,22 @@ Check the `state` field:
 
 You should use the datasourceUID from the alert when you can.
 
+If you need to query a different datasource (e.g., Loki for log correlation), resolve its UID first:
+```bash
+grafanactl datasources list --type loki
+```
+Annotation URLs often reference datasources by name — always resolve to UID before querying.
+
 Query the datasource. Use -o json to get the data for yourself. Use with a graph visualization for showing a summary to the user:
 
 ```bash
 # Prometheus
-grafanactl query -d <datasource-uid> -e '<query>' --start now-1h --end now --step 1m -o json
-grafanactl query -d <datasource-uid> -e '<query>' --start now-1h --end now --step 1m -o graph
+grafanactl query -d <datasource-uid> -e '<query>' --from now-1h --to now --step 1m -o json
+grafanactl query -d <datasource-uid> -e '<query>' --from now-1h --to now --step 1m -o graph
 
 # Loki
-grafanactl query -d <datasource-uid> -e '<query>' --start now-1h --end now -o json
-grafanactl query -d <datasource-uid> -e '<query>' --start now-1h --end now -o graph
+grafanactl query -d <datasource-uid> -e '<query>' --from now-1h --to now -o json
+grafanactl query -d <datasource-uid> -e '<query>' --from now-1h --to now -o graph
 ```
 
 Analyze the results: What's the current value? Spike or gradual? When did it start?
@@ -72,6 +83,12 @@ Provide concise analysis:
 - Trend: new spike vs ongoing
 - Likely causes: code changes, infrastructure, resource exhaustion
 - Customer impact: if relevant
+
+Based on the error class, suggest follow-up queries to the user:
+- **Connection errors**: Check endpoint availability (`up{job="..."}`) and pod restart counts
+- **Latency spikes**: Check upstream service latency, database query duration metrics
+- **Error rate increase**: Break down by endpoint/handler, correlate with recent deployments
+- **Resource exhaustion**: Check container CPU/memory metrics and node capacity
 
 Recommend incident creation if there's customer impact.
 
