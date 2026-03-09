@@ -189,6 +189,38 @@ grafanactl query -d <loki-uid> -e 'rate({job="api-server"} |= "error" [5m])' \
   --from now-2h --to now --step 1m -o graph
 ```
 
+### Querying at Scale
+
+Loki metric queries (`rate()`, `count_over_time()`, etc.) produce one series per unique label combination. At scale this hits series limits (default 20K). Always aggregate:
+
+```bash
+# BAD — one series per pod/namespace/level/... combination
+grafanactl query -d <loki-uid> -e 'count_over_time({job="app"} [5m])'
+
+# GOOD — aggregate down to what you need
+grafanactl query -d <loki-uid> -e 'sum(count_over_time({job="app"} [5m]))'
+grafanactl query -d <loki-uid> -e 'sum by(level) (count_over_time({job="app"} | json [5m]))'
+grafanactl query -d <loki-uid> -e 'topk(10, sum by(pod) (rate({job="app"} [5m])))'
+```
+
+Rule of thumb: if your query uses `rate()`, `count_over_time()`, or `bytes_over_time()`, wrap it with `sum()`, `sum by(label)`, or `topk()`.
+
+### Stream Labels vs Extracted Labels
+
+Loki has two kinds of labels — confusing them causes silent failures:
+
+| | Stream labels | Extracted labels |
+|---|---|---|
+| Set by | Log ingestion config | Parser stages (`| json`, `| logfmt`) |
+| Used in | Stream selector `{job="app"}` | Filter expressions after `|` |
+| Indexed | Yes (fast) | No (line-by-line scan) |
+| Available | Always | Only after parser stage |
+
+Common mistakes:
+- Filtering extracted labels in `{}` — fails silently: `{namespace="prod", pod="app-123"}` won't work if `pod` is extracted, not a stream label
+- Using `label_format` to rename extracted fields before they're parsed — add the parser stage first
+- Assuming a field visible in Grafana Explore is a stream label — check with `grafanactl datasources loki labels -d <uid>` (only shows stream labels)
+
 ---
 
 ## Interpreting Graph Output
