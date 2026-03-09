@@ -20,7 +20,7 @@
 | Document | Domain | Read When |
 |----------|--------|-----------|
 | [architecture.md](agent-docs/architecture.md) | System-wide architecture overview | First-time orientation, understanding overall design |
-| [patterns.md](agent-docs/patterns.md) | Recurring patterns catalog (10 patterns) | Before implementing new features |
+| [patterns.md](agent-docs/patterns.md) | Recurring patterns catalog (15 patterns) | Before implementing new features |
 | [resource-model.md](agent-docs/resource-model.md) | Resource, Selector, Filter, Discovery abstractions | Modifying resource handling |
 | [cli-layer.md](agent-docs/cli-layer.md) | Command tree, Options pattern, lifecycle | Adding/modifying CLI commands |
 | [client-api-layer.md](agent-docs/client-api-layer.md) | Dynamic client, auth, error translation | API communication changes |
@@ -76,6 +76,9 @@ cmd/grafanactl/
 ├── datasources/ Datasource commands (list, get, prometheus, loki)
 ├── query/       Query execution command (PromQL/LogQL with graph output)
 ├── providers/   Provider list command
+├── api/         Raw API passthrough command (direct Grafana API calls)
+├── linter/      Linting commands (lint, new, rules, test subcommands)
+├── dev/         Developer commands (import, scaffold subcommands)
 ├── fail/        Structured error → user-friendly message conversion
 └── io/          Output codec registry (json, yaml, text, wide)
 
@@ -93,6 +96,8 @@ internal/
 ├── query/       Datasource query clients
 │   ├── prometheus/  Prometheus HTTP query client
 │   └── loki/        Loki HTTP query client
+├── agent/       Agent mode detection (IsAgentMode, env-var + flag detection)
+├── linter/      Linting engine (Rego rules, report aggregation, PromQL/LogQL validators)
 ├── graph/       Terminal chart rendering (ntcharts + lipgloss)
 ├── testutils/   Shared test utilities
 ├── server/      Live dev server (Chi router, reverse proxy, websocket reload)
