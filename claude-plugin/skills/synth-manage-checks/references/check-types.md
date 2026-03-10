@@ -31,7 +31,8 @@ spec:
   timeout: 10000            # 10s, must be < frequency
   enabled: true
   labels:
-    environment: production
+    - name: environment
+      value: production
   probes:
     - Atlanta
     - Frankfurt
@@ -74,7 +75,8 @@ spec:
   timeout: 10000
   enabled: true
   labels:
-    environment: production
+    - name: environment
+      value: production
   probes:
     - Atlanta
     - Frankfurt
@@ -108,7 +110,8 @@ spec:
   timeout: 10000
   enabled: true
   labels:
-    environment: production
+    - name: environment
+      value: production
   probes:
     - Atlanta
     - Frankfurt
@@ -148,7 +151,8 @@ spec:
   timeout: 10000
   enabled: true
   labels:
-    environment: production
+    - name: environment
+      value: production
   probes:
     - Atlanta
     - Frankfurt
@@ -183,7 +187,8 @@ spec:
   timeout: 30000                    # higher timeout for traceroute
   enabled: true
   labels:
-    environment: production
+    - name: environment
+      value: production
   probes:
     - Atlanta
     - Frankfurt

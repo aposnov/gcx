@@ -26,6 +26,21 @@ Select query type based on what the user describes:
 | "raw PromQL expression", "custom metric formula" | `freeform` |
 | "metric above/below threshold", "latency under X ms", "availability percentage" | `threshold` |
 
+## Metric-Pattern Decision Table
+
+Use the metric name suffix to pick the query type when the user provides a metric name:
+
+| Metric suffix / type | Query type | Rationale |
+|----------------------|------------|-----------|
+| `_total` counter | `ratio` | success_total / all_total |
+| `_bucket` histogram | `threshold` | use le-bound threshold on quantile |
+| `_gauge` or `up` metric | `threshold` | compare to fixed threshold |
+| None of the above | `freeform` | last resort only |
+
+**Guardrail:** Freeform is a last resort. Before choosing freeform, verify the SLI cannot be expressed as ratio or threshold.
+
+**Hard requirement:** Freeform queries MUST use `$__rate_interval` in all `rate()`/`increase()` calls. Literal ranges like `[5m]` are rejected by the SLO API.
+
 ## Workflow 1: Create New SLO
 
 ### Step 1: Determine query type using the decision table above

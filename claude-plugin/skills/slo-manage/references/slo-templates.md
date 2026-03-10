@@ -72,10 +72,11 @@ spec:
     freeform:
       # PromQL expression that returns 0.0–1.0 representing the SLI
       # Must be a ratio of good events / total events
+      # REQUIRED: use $__rate_interval in all rate()/increase() calls — literal ranges (e.g. [5m]) are rejected by the SLO API
       query: >
-        sum(rate(http_request_duration_seconds_bucket{job="checkout",le="0.5"}[5m]))
+        sum(rate(http_request_duration_seconds_bucket{job="checkout",le="0.5"}[$__rate_interval]))
         /
-        sum(rate(http_request_duration_seconds_count{job="checkout"}[5m]))
+        sum(rate(http_request_duration_seconds_count{job="checkout"}[$__rate_interval]))
   objectives:
     - value: 0.95                   # 95% of requests complete under 500ms
       window: 28d

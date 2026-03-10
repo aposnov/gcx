@@ -97,7 +97,7 @@ reference-drift: cli-reference-drift env-var-reference-drift config-reference-dr
 .PHONY: cli-reference
 cli-reference: check-binaries ## Generates a reference for the CLI.
 	@rm -rf ./docs/reference/cli
-	@$(RUN_DEVBOX) CGO_ENABLED=0 go run scripts/cmd-reference/*.go "./docs/reference/cli"
+	@GRAFANACTL_AGENT_MODE=false $(RUN_DEVBOX) CGO_ENABLED=0 go run scripts/cmd-reference/*.go "./docs/reference/cli"
 
 .PHONY: env-var-reference
 env-var-reference: check-binaries ## Generates an environment variables reference.

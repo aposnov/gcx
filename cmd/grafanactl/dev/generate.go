@@ -139,7 +139,7 @@ func processGenerateArg(cmd *cobra.Command, tmpl *template.Template, opts *gener
 	templateName := typeToTemplate[resourceType]
 	data := map[string]any{
 		"Package":  packageName,
-		"FuncName": xstrings.ToCamelCase(name),
+		"FuncName": xstrings.ToPascalCase(name),
 		"Name":     name,
 	}
 

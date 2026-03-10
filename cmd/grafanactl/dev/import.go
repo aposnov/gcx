@@ -1,11 +1,11 @@
 package dev
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/grafana/grafana-foundation-sdk/go/cog/plugins"
@@ -18,6 +18,7 @@ import (
 	"github.com/huandu/xstrings"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/tools/imports"
 )
 
 //nolint:gochecknoglobals
@@ -129,26 +130,27 @@ func convertResource(destinationRoot string, resource *model.Resource) error {
 		return err
 	}
 
-	fileHandle, err := os.OpenFile(convertedFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer fileHandle.Close()
-
-	err = tmpl.ExecuteTemplate(fileHandle, "resource.go.tmpl", map[string]any{
-		"Package":          strings.ToLower(resource.Kind()),
+	var buf bytes.Buffer
+	err = tmpl.ExecuteTemplate(&buf, "resource.go.tmpl", map[string]any{
+		"Package":          filepath.Base(destinationRoot),
 		"GroupVersion":     gvk.GroupVersion().String(),
 		"Kind":             resource.Kind(),
 		"Name":             resource.Name(),
 		"SDKPackage":       sdkPkg,
-		"FuncName":         xstrings.ToCamelCase(resource.Name()),
+		"FuncName":         xstrings.ToPascalCase(resource.Name()),
 		"ConvertedBuilder": converted,
 	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	formatted, err := imports.Process(convertedFile, buf.Bytes(), nil)
+	if err != nil {
+		// Fall back to unformatted output if goimports fails.
+		formatted = buf.Bytes()
+	}
+
+	return os.WriteFile(convertedFile, formatted, 0600)
 }
 
 func dashboardv1Converter(resource *model.Resource) (string, string, error) {
