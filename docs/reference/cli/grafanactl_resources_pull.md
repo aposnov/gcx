@@ -51,6 +51,12 @@ grafanactl resources pull [RESOURCE_SELECTOR]... [flags]
 	# Multiple resource kinds, long kind format with version:
 
 	grafanactl resources pull dashboards.v1alpha1.dashboard.grafana.app/foo folders.v1alpha1.folder.grafana.app/qux
+
+	# Provider-backed resource types (SLO, Synthetic Monitoring, Alerting):
+
+	grafanactl resources pull slo -p ./slo-defs/
+	grafanactl resources pull checks -p ./checks/
+	grafanactl resources pull rules -p ./rules/
 ```
 
 ### Options

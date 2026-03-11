@@ -135,6 +135,11 @@ func newCommand(version string, pp []providers.Provider) *cobra.Command {
 		rootCmd.AddCommand(p.Commands()...)
 	}
 
+	// Note: Provider adapter factories are registered via adapter.Register()
+	// in each provider's init() function (same pattern as providers.Register).
+	// The discovery.Registry picks them up via adapter.RegisterAll() when
+	// resource commands create a registry instance.
+
 	rootCmd.PersistentFlags().BoolVar(&noColors, "no-color", noColors, "Disable color output")
 	rootCmd.PersistentFlags().BoolVar(&noTruncate, "no-truncate", false, "Disable table column truncation (auto-enabled when stdout is piped)")
 	rootCmd.PersistentFlags().BoolVar(&agentFlag, "agent", false, "Enable agent mode (JSON output, no color). Auto-detected from CLAUDECODE, CLAUDE_CODE, CURSOR_AGENT, GITHUB_COPILOT, AMAZON_Q, or GRAFANACTL_AGENT_MODE env vars.")

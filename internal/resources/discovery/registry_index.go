@@ -72,6 +72,51 @@ func (r *RegistryIndex) GetPreferredVersions() resources.Descriptors {
 	return res
 }
 
+// RegisterStatic registers a provider descriptor with its aliases into the index.
+// This is used for provider-backed resource types that are not discovered via /apis
+// but are instead statically declared by providers.
+func (r *RegistryIndex) RegisterStatic(desc resources.Descriptor, aliases []string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	gv := desc.GroupVersion
+
+	// Register the group (short and long forms).
+	r.longGroups[gv.Group] = struct{}{}
+	shortName := makeShortName(gv.Group)
+	r.shortGroups[shortName] = gv.Group
+
+	// Register preferred version (first registration wins).
+	if _, ok := r.preferredVersions[gv.Group]; !ok {
+		r.preferredVersions[gv.Group] = gv
+	}
+
+	// Add the descriptor to the group version.
+	r.descriptors[gv] = append(r.descriptors[gv], desc)
+
+	// Register the kind name.
+	gk := schema.GroupKind{Group: gv.Group, Kind: desc.Kind}
+	r.kindNames[desc.Kind] = append(r.kindNames[desc.Kind], gk)
+
+	// Register singular name.
+	if desc.Singular != "" {
+		r.singularNames[desc.Singular] = append(r.singularNames[desc.Singular], gk)
+	}
+
+	// Register plural name.
+	if desc.Plural != "" {
+		r.pluralNames[desc.Plural] = append(r.pluralNames[desc.Plural], gk)
+	}
+
+	// Register aliases as additional singular name lookups.
+	for _, alias := range aliases {
+		if alias == desc.Singular || alias == desc.Plural || alias == desc.Kind {
+			continue // Already registered above.
+		}
+		r.singularNames[alias] = append(r.singularNames[alias], gk)
+	}
+}
+
 // LookupPartialGVK returns a descriptor for the provided partial GVK.
 // It tries to find the most precise match based on the information in the partial GVK.
 // (i.e. it will try to scope down to the exact group & version if provided and fall back to the preferred version if not).

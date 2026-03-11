@@ -123,7 +123,7 @@ func (c *Client) Update(ctx context.Context, uuid string, slo *Slo) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNoContent {
 		return handleErrorResponse(resp)
 	}
 

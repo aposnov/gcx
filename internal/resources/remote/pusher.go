@@ -43,9 +43,10 @@ type Pusher struct {
 }
 
 // NewDefaultPusher creates a new Pusher.
-// It uses the default namespaced dynamic client to push resources to Grafana.
+// It uses a ResourceClientRouter that delegates to provider adapters for provider-backed
+// resource types, and falls back to the default namespaced dynamic client for native resources.
 func NewDefaultPusher(ctx context.Context, cfg config.NamespacedRESTConfig) (*Pusher, error) {
-	client, err := dynamic.NewDefaultNamespacedClient(cfg)
+	dynamicClient, err := dynamic.NewDefaultNamespacedClient(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,9 @@ func NewDefaultPusher(ctx context.Context, cfg config.NamespacedRESTConfig) (*Pu
 		return nil, err
 	}
 
-	return NewPusher(client, registry), nil
+	router := buildRouter(dynamicClient, registry)
+
+	return NewPusher(router, registry), nil
 }
 
 // NewPusher creates a new Pusher.

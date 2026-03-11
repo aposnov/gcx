@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/grafana/grafanactl/internal/providers"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,7 @@ func (m *mockProvider) ShortDesc() string                    { return m.shortDes
 func (m *mockProvider) Commands() []*cobra.Command           { return m.commands }
 func (m *mockProvider) Validate(cfg map[string]string) error { return m.validateFn(cfg) }
 func (m *mockProvider) ConfigKeys() []providers.ConfigKey    { return m.configKeys }
+func (m *mockProvider) ResourceAdapters() []adapter.Factory  { return nil }
 
 func TestAll(t *testing.T) {
 	t.Run("returns empty slice when no providers are registered at the internal layer", func(t *testing.T) {

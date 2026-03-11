@@ -26,8 +26,10 @@ type Deleter struct {
 }
 
 // NewDeleter creates a new Deleter.
+// It uses a ResourceClientRouter that delegates to provider adapters for provider-backed
+// resource types, and falls back to the default namespaced dynamic client for native resources.
 func NewDeleter(ctx context.Context, cfg config.NamespacedRESTConfig) (*Deleter, error) {
-	cli, err := dynamic.NewDefaultNamespacedClient(cfg)
+	dynamicClient, err := dynamic.NewDefaultNamespacedClient(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +39,10 @@ func NewDeleter(ctx context.Context, cfg config.NamespacedRESTConfig) (*Deleter,
 		return nil, err
 	}
 
+	router := buildRouter(dynamicClient, registry)
+
 	return &Deleter{
-		client:   cli,
+		client:   router,
 		registry: registry,
 	}, nil
 }

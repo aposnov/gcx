@@ -12,12 +12,30 @@ import (
 	"github.com/grafana/grafanactl/internal/providers"
 	"github.com/grafana/grafanactl/internal/providers/synth/checks"
 	"github.com/grafana/grafanactl/internal/providers/synth/probes"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 func init() { //nolint:gochecknoinits // Self-registration pattern (like database/sql drivers).
 	providers.Register(&SynthProvider{})
+
+	// Register static descriptors for checks and probes so that they appear in
+	// the discovery registry and can be used as selectors without initializing
+	// the provider config.
+	loader := &configLoader{}
+	adapter.Register(adapter.Registration{
+		Factory:    checks.NewAdapterFactory(loader),
+		Descriptor: checks.StaticDescriptor(),
+		Aliases:    checks.StaticAliases(),
+		GVK:        checks.StaticGVK(),
+	})
+	adapter.Register(adapter.Registration{
+		Factory:    probes.NewAdapterFactory(loader),
+		Descriptor: probes.StaticDescriptor(),
+		Aliases:    probes.StaticAliases(),
+		GVK:        probes.StaticGVK(),
+	})
 }
 
 // SynthProvider manages Grafana Synthetic Monitoring resources.
@@ -38,6 +56,12 @@ func (p *SynthProvider) Commands() []*cobra.Command {
 	synthCmd := &cobra.Command{
 		Use:   "synth",
 		Short: p.ShortDesc(),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if root := cmd.Root(); root.PersistentPreRun != nil {
+				root.PersistentPreRun(cmd, args)
+			}
+			providers.WarnDeprecated(cmd, "grafanactl resources list checks")
+		},
 	}
 
 	// Bind config flags on the parent — all subcommands inherit these.
@@ -66,6 +90,16 @@ func (p *SynthProvider) ConfigKeys() []providers.ConfigKey {
 		{Name: "sm-url", Secret: false},
 		{Name: "sm-token", Secret: true},
 		{Name: "sm-metrics-datasource-uid", Secret: false},
+	}
+}
+
+// ResourceAdapters returns adapter factories for Synth resource types.
+// Each factory uses a fresh configLoader to load SM credentials lazily on first invocation.
+func (p *SynthProvider) ResourceAdapters() []adapter.Factory {
+	loader := &configLoader{}
+	return []adapter.Factory{
+		checks.NewAdapterFactory(loader),
+		probes.NewAdapterFactory(loader),
 	}
 }
 

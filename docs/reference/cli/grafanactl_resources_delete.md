@@ -38,6 +38,12 @@ grafanactl resources delete [RESOURCE_SELECTOR]... [flags]
 	# Delete all dashboards using environment variable
 	GRAFANACTL_AUTO_APPROVE=1 grafanactl resources delete dashboards
 
+	# Provider-backed resource types (SLO, Synthetic Monitoring, Alerting):
+
+	grafanactl resources delete slo/my-slo-uuid
+	grafanactl resources delete checks/my-check-uuid
+	grafanactl resources delete rules/my-rule-uuid
+
 ```
 
 ### Options

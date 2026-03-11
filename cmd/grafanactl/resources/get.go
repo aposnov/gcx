@@ -100,7 +100,14 @@ func getCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 	# Multiple resource kinds, long kind format with version:
 
-	grafanactl resources get dashboards.v1alpha1.dashboard.grafana.app/foo folders.v1alpha1.folder.grafana.app/qux`,
+	grafanactl resources get dashboards.v1alpha1.dashboard.grafana.app/foo folders.v1alpha1.folder.grafana.app/qux
+
+	# Provider-backed resource types (SLO, Synthetic Monitoring, Alerting):
+
+	grafanactl resources get slo
+	grafanactl resources get slo/my-slo-uuid
+	grafanactl resources get checks
+	grafanactl resources get rules`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := opts.Validate(); err != nil {
 				return err

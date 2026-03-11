@@ -200,6 +200,7 @@ Provider interface
   +-- Commands()   []*cobra.Command     -- contributed commands
   +-- Validate()   func(map[string]string) error
   +-- ConfigKeys() []ConfigKey          -- config metadata (name + secret flag)
+  +-- ResourceAdapters() []adapter.Factory -- adapter factories for provider-backed resource types
 ```
 
 **Registry:** `providers.All()` returns all compile-time registered providers
@@ -223,6 +224,7 @@ name. Reflection-based editor picks them up via the `yaml:"providers"` tag.
 - `internal/providers/alert/provider.go`: Second provider implementation (alert rules and groups)
 - `cmd/grafanactl/providers/command.go`: `providers list` command
 - `internal/config/types.go`: `Providers` field on `Context`
+- `internal/resources/adapter/register.go`: Global adapter registration pattern (self-registration via `Register()` and `AllRegistrations()`)
 
 ---
 
@@ -369,6 +371,47 @@ behaviors regardless of actual TTY state.
 - `internal/terminal/` package with TTY detection and package-level state
 - Root command `PersistentPreRun` coordinates detection in a defined order
 - `io.Options.BindFlags` reads `terminal.IsPiped()` / `terminal.NoTruncate()` at flag-bind time
+
+**PersistentPreRun chaining convention:** In Cobra, a child command's `PersistentPreRun` replaces (not chains) the nearest ancestor's hook. Any command that defines its own `PersistentPreRun` must explicitly call the root hook first to preserve logger setup, TTY detection, and agent mode:
+
+```go
+PersistentPreRun: func(cmd *cobra.Command, args []string) {
+    if root := cmd.Root(); root.PersistentPreRun != nil {
+        root.PersistentPreRun(cmd, args)
+    }
+    // command-specific setup...
+},
+```
+
+This applies to provider commands (`slo`, `synth`, `alert`) which each define a `PersistentPreRun` for their deprecation warnings.
+
+---
+
+### 16. ResourceAdapter and Provider CRUD Routing (High Confidence: 92%)
+
+Provider-backed resource types (SLO, Synthetic Monitoring, Alert) implement the
+`adapter.ResourceAdapter` interface to bridge their REST clients to the unified
+`resources` pipeline. Adapters self-register at `init()` time using
+`adapter.Register()` — the same database/sql driver pattern. At runtime a
+`ResourceClientRouter` routes each CRUD call to the correct adapter by GVK,
+falling back to the k8s dynamic client for non-provider resource types.
+
+**Key components:**
+- `adapter.ResourceAdapter` interface: `List`, `Get`, `Create`, `Update`, `Delete`, `Descriptor`, `Aliases`
+- `adapter.Factory`: lazy constructor `func(ctx context.Context) (ResourceAdapter, error)` — invoked only on first use, then cached
+- `adapter.Register()` / `adapter.AllRegistrations()`: global self-registration called from provider `init()` functions
+- `ResourceClientRouter`: routes CRUD operations by GVK; lazily initializes adapter instances; falls back to dynamic client for unregistered GVKs
+- `RegistryIndex.RegisterStatic()`: injects provider descriptors into the discovery lookup indexes so provider types appear in `resources list` and resolve from `resources get slos`
+
+**Evidence:**
+- `internal/resources/adapter/adapter.go`: `ResourceAdapter` interface definition
+- `internal/resources/adapter/register.go`: `Register()`, `AllRegistrations()`, and global registration machinery
+- `internal/resources/adapter/router.go`: `ResourceClientRouter` implementation
+- `internal/providers/slo/definitions/resource_adapter.go`: SLO provider implementation
+- `internal/providers/synth/checks/resource_adapter.go`: Synthetic Monitoring implementation
+- `internal/providers/alert/resource_adapter.go`: Alert rules implementation
+
+**Usage:** When a provider resource type needs CRUD via `grafanactl resources`, implement `ResourceAdapter`, call `adapter.Register()` in `init()`, and call `RegistryIndex.RegisterStatic()` in `discovery.NewDefaultRegistry`.
 
 ---
 

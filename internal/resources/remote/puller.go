@@ -42,8 +42,10 @@ type Puller struct {
 }
 
 // NewDefaultPuller creates a new Puller.
+// It uses a ResourceClientRouter that delegates to provider adapters for provider-backed
+// resource types, and falls back to the default versioned dynamic client for native resources.
 func NewDefaultPuller(ctx context.Context, restConfig config.NamespacedRESTConfig) (*Puller, error) {
-	client, err := dynamic.NewDefaultVersionedClient(restConfig)
+	dynamicClient, err := dynamic.NewDefaultVersionedClient(restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +55,9 @@ func NewDefaultPuller(ctx context.Context, restConfig config.NamespacedRESTConfi
 		return nil, err
 	}
 
-	return NewPuller(client, registry), nil
+	router := buildRouter(dynamicClient, registry)
+
+	return NewPuller(router, registry), nil
 }
 
 // NewPuller creates a new Puller.

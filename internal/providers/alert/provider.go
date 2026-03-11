@@ -2,6 +2,7 @@ package alert
 
 import (
 	"github.com/grafana/grafanactl/internal/providers"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,12 @@ func (p *AlertProvider) Commands() []*cobra.Command {
 	alertCmd := &cobra.Command{
 		Use:   "alert",
 		Short: p.ShortDesc(),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if root := cmd.Root(); root.PersistentPreRun != nil {
+				root.PersistentPreRun(cmd, args)
+			}
+			providers.WarnDeprecated(cmd, "grafanactl resources list rules")
+		},
 	}
 
 	loader.BindFlags(alertCmd.PersistentFlags())
@@ -44,5 +51,11 @@ func (p *AlertProvider) Validate(cfg map[string]string) error {
 
 // ConfigKeys returns the configuration keys used by this provider.
 func (p *AlertProvider) ConfigKeys() []providers.ConfigKey {
+	return nil
+}
+
+// ResourceAdapters returns adapter factories for Alert resource types.
+// Factories are registered globally via adapter.Register() in resource_adapter.go init().
+func (p *AlertProvider) ResourceAdapters() []adapter.Factory {
 	return nil
 }

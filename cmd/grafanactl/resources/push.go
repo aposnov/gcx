@@ -91,7 +91,18 @@ func pushCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 	# Multiple resource kinds, long kind format with version:
 
-	grafanactl resources push dashboards.v1alpha1.dashboard.grafana.app/foo folders.v1alpha1.folder.grafana.app/qux`,
+	grafanactl resources push dashboards.v1alpha1.dashboard.grafana.app/foo folders.v1alpha1.folder.grafana.app/qux
+
+	# Provider-backed resource types (SLO, Synthetic Monitoring, Alerting):
+
+	grafanactl resources push slo -p ./slo-defs/
+	grafanactl resources push checks -p ./checks/
+	grafanactl resources push rules -p ./rules/
+
+	# Mixed push: native and provider resources from the same directory
+	# (types auto-detected from apiVersion/kind in YAML files):
+
+	grafanactl resources push -p ./resources/`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 

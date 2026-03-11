@@ -1,6 +1,9 @@
 package providers
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/grafana/grafanactl/internal/resources/adapter"
+	"github.com/spf13/cobra"
+)
 
 // ConfigKey describes a single configuration key for a provider.
 type ConfigKey struct {
@@ -29,4 +32,9 @@ type Provider interface {
 	// ConfigKeys returns the configuration keys used by this provider,
 	// including metadata about which keys are secrets.
 	ConfigKeys() []ConfigKey
+
+	// ResourceAdapters returns adapter factories for resource types that this
+	// provider exposes through the unified resources pipeline. Providers that
+	// do not support resource adapters return nil.
+	ResourceAdapters() []adapter.Factory
 }

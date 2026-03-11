@@ -322,6 +322,55 @@ PULL pipeline (cmd/grafanactl/resources/pull.go):
 
 ---
 
+## 5b. Provider-Backed Resources: ResourceAdapter and Router
+
+**Files:** `internal/resources/adapter/adapter.go`, `internal/resources/adapter/router.go`
+
+Some resource types are backed by provider REST APIs (SLO, Synthetic Monitoring, Alert)
+rather than by the Grafana k8s-compatible `/apis` endpoint. These types plug into the
+unified `resources` pipeline via the `ResourceAdapter` interface:
+
+```
+ResourceAdapter interface
+  +-- List(ctx, ListOptions)    → (*UnstructuredList, error)
+  +-- Get(ctx, name, GetOptions) → (*Unstructured, error)
+  +-- Create(ctx, obj, CreateOptions) → (*Unstructured, error)
+  +-- Update(ctx, obj, UpdateOptions) → (*Unstructured, error)
+  +-- Delete(ctx, name, DeleteOptions) → error
+  +-- Descriptor() Descriptor
+  +-- Aliases() []string
+```
+
+`adapter.Factory` is `func(ctx context.Context) (ResourceAdapter, error)` — a lazy
+constructor that is only called on first use and its result cached for the router's
+lifetime.
+
+### Self-Registration Pattern
+
+Provider packages call `adapter.Register()` in their `init()` function with a
+`Registration{Factory, Descriptor, Aliases, GVK}`. This is the database/sql driver
+pattern — importing the provider package is sufficient to register its adapters.
+
+### ResourceClientRouter
+
+`ResourceClientRouter` wraps both a `DynamicClient` (k8s path) and a
+`map[GVK]Factory` (adapter path). For every CRUD call:
+1. Look up GVK in the factory map
+2. If found: lazily initialize the adapter (first call only), then delegate
+3. If not found: fall through to the k8s dynamic client
+
+This makes provider-backed types transparent to the rest of the pipeline — the
+Pusher, Puller, and Deleter call the router without knowing whether the underlying
+client is a REST adapter or the k8s dynamic client.
+
+### Discovery Integration
+
+Provider descriptors are injected into the `RegistryIndex` via `RegisterStatic(desc, aliases)`
+so that provider types appear in `resources list` output and resolve correctly from
+selector strings like `"slos"` or `"rules"`.
+
+---
+
 ## 6. Why the Kubernetes Resource Model
 
 Grafana 12+ exposes its API as a Kubernetes-style API server (using `grafana/grafana/pkg/apimachinery`). The same `apiVersion/kind/metadata/spec` structure used by Kubernetes is used by Grafana's API. This was not a grafanactl design choice — it is a direct consequence of Grafana's server architecture.
@@ -393,3 +442,6 @@ PartialGVK                         Descriptor
 | `internal/resources/process/namespace.go` | `NamespaceOverrider` |
 | `cmd/grafanactl/resources/push.go` | Push pipeline wiring (processors, registry, filters) |
 | `cmd/grafanactl/resources/pull.go` | Pull pipeline wiring (processors, registry, filters) |
+| `internal/resources/adapter/adapter.go` | `ResourceAdapter` interface and `Factory` type |
+| `internal/resources/adapter/register.go` | Global `Register()`, `AllRegistrations()` for self-registration |
+| `internal/resources/adapter/router.go` | `ResourceClientRouter` — routes CRUD to adapter or dynamic client |

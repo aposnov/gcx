@@ -306,9 +306,9 @@ registration code.
 
 ## 5. Client Architecture
 
-### Three Client Paths
+### Four Client Paths
 
-The codebase has three distinct communication paths to Grafana:
+The codebase has four distinct communication paths to Grafana:
 
 **Primary (dynamic client):** `k8s.io/client-go` -> `/apis` endpoint
 - Used for all resource CRUD operations
@@ -327,6 +327,12 @@ The codebase has three distinct communication paths to Grafana:
 - Bypasses k8s API machinery entirely (no GVK, no dynamic.Interface)
 - Uses the same auth config as the dynamic client (`rest.Config` -> `rest.HTTPClientFor`)
 - Hits datasource-specific sub-resource endpoints (`/apis/prometheus.datasource.grafana.app/...`)
+
+**Quaternary (provider adapter client):** `adapter.ResourceAdapter` implementations -> provider REST APIs
+- Used for provider-backed resource types: SLO (`slo.ext.grafana.app`), Synthetic Monitoring (`syntheticmonitoring.ext.grafana.app`), Alert (`alerting.ext.grafana.app`)
+- Each adapter wraps a provider-specific REST client (SLO API, SM API, Prometheus-compatible Alert API)
+- Routed via `ResourceClientRouter`: calls to Pusher/Puller/Deleter are transparently dispatched to the adapter for registered GVKs, falling back to the primary dynamic client for all others
+- Read-only adapters (Alert rules/groups, SM Probes) return `errors.ErrUnsupported` for Create/Update/Delete
 
 ### Auth Flow
 
@@ -405,7 +411,8 @@ time, ensuring flags are already parsed.
 | Push (folders) | ForEachConcurrently per level | MaxConcurrency | Yes (--max-concurrent) |
 | Push (non-folders) | ForEachConcurrently | MaxConcurrency | Yes (--max-concurrent) |
 | Delete | ForEachConcurrently | MaxConcurrency | Yes (--max-concurrent) |
-| GetMultiple | errgroup (no SetLimit) | Unbounded (QPS/Burst only) | No |
+| `NamespacedClient.GetMultiple` | errgroup (no SetLimit) | Unbounded (QPS/Burst only) | No |
+| `ResourceClientRouter.GetMultiple` (adapter path) | errgroup + SetLimit(10) | 10 | No |
 | HTTP rate limiting | k8s token bucket | QPS=50, Burst=100 | No (hardcoded) |
 
 Default `MaxConcurrency` is 10 for all operations.
@@ -575,6 +582,14 @@ Files most important for understanding the codebase. Organized by architectural 
 | `internal/resources/remote/folder_hierarchy.go` | SortFoldersByDependency (topological sort) |
 | `internal/resources/remote/summary.go` | OperationSummary (thread-safe result tracking) |
 
+### Adapter Layer
+
+| File | Purpose |
+|------|---------|
+| `internal/resources/adapter/adapter.go` | `ResourceAdapter` interface and `Factory` type |
+| `internal/resources/adapter/register.go` | Global adapter registration — `Register()`, `AllRegistrations()` |
+| `internal/resources/adapter/router.go` | `ResourceClientRouter` — GVK-based routing to adapter or dynamic client |
+
 ### Processors
 
 | File | Purpose |
@@ -639,7 +654,7 @@ Files most important for understanding the codebase. Organized by architectural 
 
 | File | Purpose |
 |------|---------|
-| `internal/providers/provider.go` | `Provider` interface, `ConfigKey` metadata type |
+| `internal/providers/provider.go` | `Provider` interface (incl. ResourceAdapters()), `ConfigKey` metadata type |
 | `internal/providers/registry.go` | `All()` — compile-time provider registry |
 | `internal/providers/redact.go` | `RedactSecrets()` — secure-by-default secret redaction |
 | `cmd/grafanactl/providers/command.go` | `providers` command (list registered providers) |

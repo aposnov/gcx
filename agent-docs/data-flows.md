@@ -72,6 +72,8 @@ User invocation:
   ┌───────────────────────▼──────────────────────────────────────────────┐
   │ 4. Push via Pusher                                                    │
   │    remote.NewDefaultPusher(ctx, cfg) → Pusher                        │
+  │    (internally builds ResourceClientRouter: adapter path for          │
+  │     provider-backed GVKs, k8s dynamic client for all others)         │
   │    pusher.Push(ctx, PushRequest{...})                                 │
   │                                                                       │
   │    Processors applied (in order) per resource:                        │
@@ -119,6 +121,7 @@ Key files:
 - `internal/resources/remote/pusher.go` — Pusher, upsertResource
 - `internal/resources/process/managerfields.go` — ManagerFieldsAppender
 - `internal/resources/process/namespace.go` — NamespaceOverrider
+- `internal/resources/adapter/router.go` — ResourceClientRouter (routes CRUD to adapter or dynamic client)
 
 ---
 
@@ -134,6 +137,8 @@ Entry point: `cmd/grafanactl/resources/pull.go` (mirrors push structure).
   ┌───────────────────────▼──────────────────────────────────────────────┐
   │ 2. Pull via Puller                                                    │
   │    remote.NewDefaultPuller(ctx, cfg) → Puller                        │
+  │    (uses ResourceClientRouter — adapter path for                      │
+  │     provider-backed GVKs)                                             │
   │    Uses VersionedClient (not NamespacedClient) for preferred versions│
   │                                                                       │
   │    If no filters: expand to ALL preferred resources                   │
@@ -184,6 +189,7 @@ Key files:
 - `internal/resources/remote/puller.go` — Puller, concurrent fetch
 - `internal/resources/process/serverfields.go` — ServerFieldsStripper
 - `internal/resources/local/writer.go` — FSWriter
+- `internal/resources/adapter/router.go` — ResourceClientRouter (routes CRUD to adapter or dynamic client)
 
 ---
 
@@ -215,10 +221,42 @@ CLI args or read from disk by the caller before passing to `Deleter`).
   └──────────────────────────────────────────────────────────────────────┘
 ```
 
-Key file: `internal/resources/remote/deleter.go`
+Key files:
+- `internal/resources/remote/deleter.go` — Deleter, delete operations
+- `internal/resources/adapter/router.go` — ResourceClientRouter (routes CRUD to adapter or dynamic client)
 
 Difference from push: Deleter does NOT check `res.IsManaged()`. It trusts the caller
-to have already resolved which resources should be deleted.
+to have already resolved which resources should be deleted. The `NewDeleter` constructor
+builds a `ResourceClientRouter` to route delete calls to provider adapters or the k8s
+dynamic client depending on resource type.
+
+---
+
+## 4b. Provider-Backed Resource Routing
+
+For resource types backed by provider REST APIs (SLO, Synthetic Monitoring, Alert),
+the Pusher/Puller/Deleter's underlying client is a `ResourceClientRouter`. The router
+transparently routes each CRUD call:
+
+```
+Client call (Get/List/Create/Update/Delete)
+      |
+      v  ResourceClientRouter.getAdapter(ctx, gvk)
+      |
+ GVK registered?
+      |
+ YES  |  NO
+  ↓       ↓
+ResourceAdapter    k8s DynamicClient
+(provider REST)    (/apis endpoint)
+```
+
+Adapters are lazily initialized (factory called once, result cached). For read-only
+provider types (Alert rules/groups), Create/Update/Delete return `errors.ErrUnsupported`.
+
+This routing is transparent to processors, selectors, and the CLI layer — they
+interact with the same Pusher/Puller/Deleter interface regardless of whether the
+backing client is a REST adapter or the k8s dynamic client.
 
 ---
 

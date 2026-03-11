@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/grafanactl/cmd/grafanactl/providers"
 	coreproviders "github.com/grafana/grafanactl/internal/providers"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/grafana/grafanactl/internal/testutils"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,7 @@ func (m *mockProvider) ShortDesc() string                     { return m.shortDe
 func (m *mockProvider) Commands() []*cobra.Command            { return nil }
 func (m *mockProvider) Validate(_ map[string]string) error    { return nil }
 func (m *mockProvider) ConfigKeys() []coreproviders.ConfigKey { return nil }
+func (m *mockProvider) ResourceAdapters() []adapter.Factory   { return nil }
 
 var _ coreproviders.Provider = (*mockProvider)(nil)
 

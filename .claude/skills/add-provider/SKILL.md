@@ -381,6 +381,51 @@ import (
 
 This triggers `init()` → `providers.Register()` → `providers.All()` returns it.
 
+**Also register a ResourceAdapter** so the provider's resource types appear in
+`grafanactl resources list/get/push/pull/delete`. In the provider's `init()`,
+call `adapter.Register()` for each resource type:
+
+```go
+import "github.com/grafana/grafanactl/internal/resources/adapter"
+
+func init() {
+    providers.Register(&{Name}Provider{})
+
+    adapter.Register(adapter.Registration{
+        Descriptor: resources.Descriptor{
+            GroupVersion: schema.GroupVersion{Group: "{group}.ext.grafana.app", Version: "v1alpha1"},
+            Kind:         "{Kind}",
+            Singular:     "{singular}",
+            Plural:       "{plural}",
+        },
+        Aliases: []string{"{short-alias}"},
+        GVK: schema.GroupVersionKind{
+            Group:   "{group}.ext.grafana.app",
+            Version: "v1alpha1",
+            Kind:    "{Kind}",
+        },
+        Factory: func(ctx context.Context) (adapter.ResourceAdapter, error) {
+            // Load provider config and return a new adapter instance.
+            // Config loading MUST be lazy (only when this factory is invoked).
+            ...
+        },
+    })
+}
+```
+
+This makes the provider's resource types accessible through:
+```
+grafanactl resources list {short-alias}
+grafanactl resources get {short-alias}/<id>
+grafanactl resources push {short-alias}
+grafanactl resources pull {short-alias}
+grafanactl resources delete {short-alias}/<id>
+```
+
+Note: keep the top-level provider commands (`grafanactl {name}`) for
+backward compatibility but add a deprecation warning to stderr pointing
+users to the unified path.
+
 ### Step 7: Tests (`provider-guide.md` Step 7)
 
 Write contract tests for the provider interface + unit tests for each component:

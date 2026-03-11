@@ -42,6 +42,24 @@ Grafana's native K8s API and need no provider.
 **Examples**: SLO (plugin API, custom status commands), Synthetic Monitoring
 (separate service URL + token), OnCall (separate API).
 
+**Important: CRUD via unified resources path**. Once a provider implements
+`ResourceAdapter` and registers a static descriptor (via `adapter.Register()`
+in its `init()` function), its resource types become accessible through the
+unified `grafanactl resources` command:
+
+```
+grafanactl resources list slo         # replaces: grafanactl slo definitions list
+grafanactl resources get slo/<uuid>   # replaces: grafanactl slo definitions get <uuid>
+grafanactl resources push slo -p ./   # replaces: grafanactl slo definitions push
+grafanactl resources pull slo -p ./   # replaces: grafanactl slo definitions pull
+grafanactl resources delete slo/<id>  # replaces: grafanactl slo definitions delete <id>
+```
+
+The provider-specific top-level commands (`grafanactl slo`, `grafanactl synth`,
+`grafanactl alert`) remain available for backward compatibility but print a
+deprecation warning to stderr. New providers should implement `ResourceAdapter`
+alongside the existing command tree from the start.
+
 ### Edge cases
 
 | Situation | Decision | Reason |

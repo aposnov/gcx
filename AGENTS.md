@@ -66,10 +66,15 @@ make all         # lint + tests + build + docs
 make docs        # Generate + build all documentation
 ```
 
-> **Before pushing to a PR branch, always run `make all`.** The `make docs` step
-> regenerates `docs/reference/cli/` from Cobra flag definitions. Skipping it causes
-> CI to fail with docs drift (new flags like `--json` or `--no-truncate` will be
-> missing from the reference pages).
+> **Before pushing to a PR branch, always run `make all` with agent mode explicitly disabled.**
+> The `make docs` step regenerates `docs/reference/cli/` by running the binary, which
+> auto-detects agent mode from env vars like `CLAUDECODE` or `CLAUDE_CODE`. When those
+> are set, the binary flips default output formats (e.g. `"json"` instead of `"table"`),
+> producing wrong docs. `GRAFANACTL_AGENT_MODE=false` overrides all detection:
+> ```
+> GRAFANACTL_AGENT_MODE=false make all
+> ```
+> Skipping this causes CI to fail with docs drift.
 
 > **Run `/update-agent-docs` when a PR changes architecture.** Specifically: adding
 > or removing packages under `internal/` or `cmd/`, introducing new architectural
@@ -99,13 +104,16 @@ internal/
 ├── config/      Config types, loader, editor, rest.Config builder, stack-id discovery
 ├── resources/
 │   ├── *.go     Core types: Resource, Selector, Filter, Descriptor, Resources collection
+│   ├── adapter/    ResourceAdapter interface, Factory, ResourceClientRouter, self-registration
 │   ├── discovery/  API resource discovery, registry index, GVK resolution
 │   ├── dynamic/    k8s dynamic client wrapper (namespaced + versioned)
 │   ├── local/      FSReader, FSWriter (disk I/O)
 │   ├── process/    Processors: ManagerFields, ServerFields, Namespace
 │   └── remote/     Pusher, Puller, Deleter, FolderHierarchy, Summary
 ├── providers/   Provider plugin system (interface, registry, self-registration)
-│   └── slo/        SLO provider (definitions, reports, status, timeline)
+│   ├── slo/        SLO provider (definitions, reports)
+│   ├── synth/      Synthetic Monitoring provider (checks, probes)
+│   └── alert/      Alert provider (rules, groups — read-only)
 ├── query/       Datasource query clients
 │   ├── prometheus/  Prometheus HTTP query client
 │   └── loki/        Loki HTTP query client

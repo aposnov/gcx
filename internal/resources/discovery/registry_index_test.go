@@ -533,6 +533,101 @@ func TestRegistryIndex_LookupAllVersionsForPartialGVK(t *testing.T) {
 	}
 }
 
+func TestRegistryIndex_RegisterStatic(t *testing.T) {
+	sloDesc := resources.Descriptor{
+		GroupVersion: schema.GroupVersion{Group: "slo.ext.grafana.app", Version: "v1alpha1"},
+		Kind:         "SLO",
+		Singular:     "slo",
+		Plural:       "slos",
+	}
+
+	t.Run("LookupPartialGVK resolves by alias", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		desc, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "slo"})
+		require.True(t, ok, "expected alias 'slo' to resolve")
+		assert.Equal(t, sloDesc, desc)
+	})
+
+	t.Run("LookupPartialGVK resolves by kind", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		desc, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "SLO"})
+		require.True(t, ok, "expected kind 'SLO' to resolve")
+		assert.Equal(t, sloDesc, desc)
+	})
+
+	t.Run("LookupPartialGVK resolves by plural", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		desc, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "slos"})
+		require.True(t, ok, "expected plural 'slos' to resolve")
+		assert.Equal(t, sloDesc, desc)
+	})
+
+	t.Run("LookupPartialGVK resolves by short group", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		desc, ok := idx.LookupPartialGVK(resources.PartialGVK{
+			Resource: "slo",
+			Group:    "slo",
+		})
+		require.True(t, ok, "expected short group 'slo' to resolve")
+		assert.Equal(t, sloDesc, desc)
+	})
+
+	t.Run("GetDescriptors includes static descriptors", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		descs := idx.GetDescriptors()
+		assert.Contains(t, descs, sloDesc)
+	})
+
+	t.Run("GetPreferredVersions includes static descriptors", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		preferred := idx.GetPreferredVersions()
+		assert.Contains(t, preferred, sloDesc)
+	})
+
+	t.Run("static and dynamic descriptors coexist", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+
+		// Register dynamic discovery first.
+		groups, res := getSingleVersionDiscovery()
+		require.NoError(t, idx.Update(t.Context(), groups, res))
+
+		// Then register static.
+		idx.RegisterStatic(sloDesc, []string{"slo"})
+
+		// Native resource still resolves.
+		dashDesc, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "dashboards"})
+		require.True(t, ok)
+		assert.Equal(t, "Dashboard", dashDesc.Kind)
+
+		// Static resource also resolves.
+		sloFound, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "slo"})
+		require.True(t, ok)
+		assert.Equal(t, "SLO", sloFound.Kind)
+	})
+
+	t.Run("no regression for native resource lookup when no static registered", func(t *testing.T) {
+		idx := discovery.NewRegistryIndex()
+		groups, res := getSingleVersionDiscovery()
+		require.NoError(t, idx.Update(t.Context(), groups, res))
+
+		desc, ok := idx.LookupPartialGVK(resources.PartialGVK{Resource: "dashboards"})
+		require.True(t, ok)
+		assert.Equal(t, "Dashboard", desc.Kind)
+	})
+}
+
 func getEmptyDiscovery() ([]*metav1.APIGroup, []*metav1.APIResourceList) {
 	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}
 }

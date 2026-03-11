@@ -4,6 +4,7 @@ import (
 	"github.com/grafana/grafanactl/internal/providers"
 	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 	"github.com/grafana/grafanactl/internal/providers/slo/reports"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,12 @@ func (p *SLOProvider) Commands() []*cobra.Command {
 	sloCmd := &cobra.Command{
 		Use:   "slo",
 		Short: p.ShortDesc(),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if root := cmd.Root(); root.PersistentPreRun != nil {
+				root.PersistentPreRun(cmd, args)
+			}
+			providers.WarnDeprecated(cmd, "grafanactl resources list slo")
+		},
 	}
 
 	// Bind config flags on the parent — all subcommands inherit these.
@@ -50,4 +57,9 @@ func (p *SLOProvider) Validate(cfg map[string]string) error {
 // additional provider-specific keys.
 func (p *SLOProvider) ConfigKeys() []providers.ConfigKey {
 	return nil
+}
+
+// ResourceAdapters returns adapter factories for SLO resource types.
+func (p *SLOProvider) ResourceAdapters() []adapter.Factory {
+	return []adapter.Factory{definitions.NewLazyFactory()}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/grafanactl/cmd/grafanactl/root"
 	"github.com/grafana/grafanactl/internal/providers"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,12 @@ type mockProvider struct {
 	commands []*cobra.Command
 }
 
-func (m *mockProvider) Name() string                       { return m.name }
-func (m *mockProvider) ShortDesc() string                  { return m.name + " provider" }
-func (m *mockProvider) Commands() []*cobra.Command         { return m.commands }
-func (m *mockProvider) Validate(_ map[string]string) error { return nil }
-func (m *mockProvider) ConfigKeys() []providers.ConfigKey  { return nil }
+func (m *mockProvider) Name() string                        { return m.name }
+func (m *mockProvider) ShortDesc() string                   { return m.name + " provider" }
+func (m *mockProvider) Commands() []*cobra.Command          { return m.commands }
+func (m *mockProvider) Validate(_ map[string]string) error  { return nil }
+func (m *mockProvider) ConfigKeys() []providers.ConfigKey   { return nil }
+func (m *mockProvider) ResourceAdapters() []adapter.Factory { return nil }
 
 var _ providers.Provider = (*mockProvider)(nil)
 

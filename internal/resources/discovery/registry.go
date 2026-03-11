@@ -7,7 +7,9 @@ import (
 
 	"github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/resources"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 )
 
@@ -33,18 +35,28 @@ type Client interface {
 
 // Registry is a registry of resources and their preferred versions.
 type Registry struct {
-	client Client
-	index  RegistryIndex
+	client   Client
+	index    RegistryIndex
+	adapters map[schema.GroupVersionKind]adapter.Factory
 }
 
 // NewDefaultRegistry creates a new discovery registry using the default discovery client.
+// It automatically registers all provider adapters into the registry via adapter.RegisterAll,
+// so that provider resource types are available alongside native K8s-style resources.
 func NewDefaultRegistry(ctx context.Context, cfg config.NamespacedRESTConfig) (*Registry, error) {
 	client, err := discovery.NewDiscoveryClientForConfig(&cfg.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewRegistry(ctx, client)
+	reg, err := NewRegistry(ctx, client)
+	if err != nil {
+		return reg, err
+	}
+
+	adapter.RegisterAll(ctx, reg)
+
+	return reg, nil
 }
 
 // NewRegistry creates a new discovery registry.
@@ -55,8 +67,9 @@ func NewDefaultRegistry(ctx context.Context, cfg config.NamespacedRESTConfig) (*
 // The registry will perform the discovery upon initialization.
 func NewRegistry(ctx context.Context, client Client) (*Registry, error) {
 	reg := &Registry{
-		client: client,
-		index:  NewRegistryIndex(),
+		client:   client,
+		index:    NewRegistryIndex(),
+		adapters: make(map[schema.GroupVersionKind]adapter.Factory),
 	}
 
 	// Perform initial discovery.
@@ -65,6 +78,16 @@ func NewRegistry(ctx context.Context, client Client) (*Registry, error) {
 	}
 
 	return reg, nil
+}
+
+// NewStaticRegistry creates a registry without a discovery client.
+// It only supports statically registered provider descriptors.
+// Useful in tests and for scenarios where no Grafana server is available.
+func NewStaticRegistry() *Registry {
+	return &Registry{
+		index:    NewRegistryIndex(),
+		adapters: make(map[schema.GroupVersionKind]adapter.Factory),
+	}
 }
 
 // MakeFiltersOptions contains options for creating filters from selectors.
@@ -100,6 +123,27 @@ func (r *Registry) PreferredResources() resources.Descriptors {
 // SupportedResources returns all resources supported by the server.
 func (r *Registry) SupportedResources() resources.Descriptors {
 	return r.index.GetDescriptors()
+}
+
+// RegisterAdapter registers a provider adapter factory and its static descriptor
+// in the registry. The descriptor becomes resolvable through LookupPartialGVK
+// alongside dynamically discovered resources.
+func (r *Registry) RegisterAdapter(factory adapter.Factory, desc resources.Descriptor, aliases []string) {
+	r.index.RegisterStatic(desc, aliases)
+	r.adapters[desc.GroupVersionKind()] = factory
+}
+
+// GetAdapter returns the adapter factory for the given GVK, if one is registered.
+func (r *Registry) GetAdapter(gvk schema.GroupVersionKind) (adapter.Factory, bool) {
+	f, ok := r.adapters[gvk]
+	return f, ok
+}
+
+// HasAdapter reports whether the given GVK is backed by a provider adapter
+// rather than the K8s dynamic client.
+func (r *Registry) HasAdapter(gvk schema.GroupVersionKind) bool {
+	_, ok := r.adapters[gvk]
+	return ok
 }
 
 // Discover discovers the resources and their preferred versions from the server,
