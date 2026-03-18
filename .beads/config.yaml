@@ -1,0 +1,3 @@
+sync:
+  git-remote: git@github.com:grafana/grafanactl-experiments.git
+
