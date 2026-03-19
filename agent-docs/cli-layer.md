@@ -64,21 +64,20 @@ grafanactl (root)
 │   ├── prometheus           Prometheus-specific operations
 │   │   ├── labels           [--datasource/-d UID] [--label/-l NAME]
 │   │   ├── metadata         [--datasource/-d UID] [--metric/-m NAME]
-│   │   └── targets          [--datasource/-d UID] [--state active|dropped|any]
-│   └── loki                 Loki-specific operations
-│       ├── labels           [--datasource/-d UID] [--label/-l NAME]
-│       └── series           --match SELECTOR... [--datasource/-d UID]
-│
-├── query                    [cmd/grafanactl/query/command.go]
-│   ├── --config             [persistent: inherited from config.Options]
-│   ├── --context            [persistent: inherited from config.Options]
-│   ├── --expr / -e          Query expression (PromQL or LogQL)  [required]
-│   ├── --type / -t          Datasource type: prometheus|loki  [default: prometheus]
-│   ├── --datasource / -d    Datasource UID (or use config default)
-│   ├── --start              Start time (RFC3339, Unix, or relative e.g. now-1h)
-│   ├── --end                End time (RFC3339, Unix, or relative e.g. now)
-│   ├── --step               Query step (e.g. 15s, 1m)
-│   └── --output / -o        table|json|yaml|graph  [default: table]
+│   │   ├── targets          [--datasource/-d UID] [--state active|dropped|any]
+│   │   └── query            [DATASOURCE_UID] EXPR   [--from] [--to] [--step] [--window] [-o]
+│   ├── loki                 Loki-specific operations
+│   │   ├── labels           [--datasource/-d UID] [--label/-l NAME]
+│   │   ├── series           --match SELECTOR... [--datasource/-d UID]
+│   │   └── query            [DATASOURCE_UID] EXPR   [--from] [--to] [--window] [--limit] [-o]
+│   ├── pyroscope            Pyroscope-specific operations
+│   │   ├── labels           [--datasource/-d UID]
+│   │   ├── profile-types    [--datasource/-d UID]
+│   │   └── query            [DATASOURCE_UID] EXPR   [--from] [--to] --profile-type [--max-nodes] [-o]
+│   ├── tempo                Tempo-specific operations
+│   │   └── query                                    (stub — "not yet implemented")
+│   └── generic              Generic datasource operations (auto-detects type)
+│       └── query            DATASOURCE_UID  EXPR    [--from] [--to] [--step] [--window] [--limit] [--profile-type] [--max-nodes] [-o]
 │
 ├── providers                [cmd/grafanactl/providers/command.go]
 │   └── (list; no subcommands — prints NAME/DESCRIPTION table of registered providers)
@@ -226,11 +225,20 @@ cmd/grafanactl/
 │   ├── command.go           datasources group (wires configOpts to subcommands)
 │   ├── list.go              datasources list
 │   ├── get.go               datasources get
-│   ├── prometheus.go        prometheus subgroup + labels/metadata/targets commands
-│   └── loki.go              loki subgroup + labels/series commands
-├── query/
-│   ├── command.go           query command (--expr, --type, --datasource, --start, --end, --step)
-│   └── graph.go             queryGraphCodec — terminal chart via internal/graph
+│   ├── prometheus.go        prometheus subgroup + labels/metadata/targets + query.PrometheusCmd
+│   ├── loki.go              loki subgroup + labels/series + query.LokiCmd
+│   ├── pyroscope.go         pyroscope subgroup + labels/profile-types + query.PyroscopeCmd
+│   ├── tempo.go             tempo subgroup + query.TempoCmd
+│   ├── generic.go           generic subgroup + query.GenericCmd
+│   └── query/               Query subcommand shared infrastructure (codecs, time parsing, per-kind constructors)
+│       ├── query.go         Shared opts, resolveTypedArgs, validateDatasourceType
+│       ├── codecs.go        queryTableCodec, queryGraphCodec (codec registry)
+│       ├── time.go          ParseTime, ParseDuration for flag parsing
+│       ├── prometheus.go    PrometheusCmd() constructor
+│       ├── loki.go          LokiCmd() constructor
+│       ├── pyroscope.go     PyroscopeCmd() constructor
+│       ├── tempo.go         TempoCmd() constructor (stub)
+│       └── generic.go       GenericCmd() constructor
 ├── providers/
 │   └── command.go           providers command — lists registered providers
 ├── linter/
@@ -509,7 +517,7 @@ print available fields via `DiscoverFields()` and exit early (exit 0).
 
 Built-in codecs: `json` and `yaml` (always available). Commands register additional ones (e.g. `text`, `wide`, `graph`) by calling `RegisterCustomCodec` before `BindFlags`.
 
-The `graph` codec is a special-purpose output format available on the `query` command and `synth checks status`. It renders Prometheus or Loki query results (or check status metrics) as a terminal line chart using `ntcharts` and `lipgloss` (via `internal/graph`). Terminal width is detected at render time via `golang.org/x/term`.
+The `graph` codec is a special-purpose output format available on per-kind `query` subcommands (`datasources prometheus query`, `datasources loki query`, etc.) and `synth checks status`. It renders Prometheus or Loki query results (or check status metrics) as a terminal line chart using `ntcharts` and `lipgloss` (via `internal/graph`). Terminal width is detected at render time via `golang.org/x/term`.
 
 The `wide` codec is available on `slo definitions list`, `slo reports list`, and `synth checks status`. It shows additional detail columns compared to the default `text` table codec.
 

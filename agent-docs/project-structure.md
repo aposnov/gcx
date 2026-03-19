@@ -12,8 +12,8 @@ grafanactl/
 │       ├── resources/        # 'resources' subcommand implementations
 │       ├── dashboards/       # 'dashboards' subcommand (snapshot via Image Renderer)
 │       ├── datasources/      # 'datasources' subcommand implementations
+│       │   └── query/        # Per-kind query constructors and shared infrastructure (codecs, time parsing)
 │       ├── dev/              # 'dev' subcommand (import, scaffold, generate, lint, serve)
-│       ├── query/            # 'query' subcommand implementation
 │       ├── providers/        # 'providers' subcommand implementation
 │       ├── fail/             # Error → DetailedError conversion, exit codes
 │       └── io/               # Output formatting, user-facing messages

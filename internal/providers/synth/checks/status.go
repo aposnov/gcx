@@ -649,7 +649,7 @@ func computeCheckStatus(success *float64) string {
 
 // resolveDataSourceUID resolves the Prometheus datasource UID from:
 // 1. Explicit flag value (highest priority).
-// 2. Global config: contexts.<name>.default-prometheus-datasource.
+// 2. Shared config resolver: datasources.prometheus → default-prometheus-datasource.
 // 3. SM provider cache: providers.synth.sm-metrics-datasource-uid.
 // 4. Auto-discover via SM plugin settings — result saved to SM cache for next run.
 func resolveDataSourceUID(ctx context.Context, flagUID string, loader smcfg.StatusLoader) (string, error) {
@@ -669,8 +669,9 @@ func resolveDataSourceUID(ctx context.Context, flagUID string, loader smcfg.Stat
 			"datasource UID is required: use --datasource-uid flag or set default-prometheus-datasource in config")
 	}
 
-	// Tier 2: global context default.
-	if uid := curCtx.DefaultPrometheusDatasource; uid != "" {
+	// Tier 2: shared config resolver — covers datasources.prometheus (new section)
+	// then default-prometheus-datasource (legacy key) in priority order.
+	if uid := config.DefaultDatasourceUID(*curCtx, "prometheus"); uid != "" {
 		return uid, nil
 	}
 

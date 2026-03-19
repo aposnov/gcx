@@ -1,15 +1,15 @@
-## grafanactl datasources loki
+## grafanactl datasources tempo
 
-Loki datasource operations
+Tempo datasource operations
 
 ### Synopsis
 
-Operations specific to Loki datasources such as labels and series.
+Operations specific to Tempo datasources such as queries.
 
 ### Options
 
 ```
-  -h, --help   help for loki
+  -h, --help   help for tempo
 ```
 
 ### Options inherited from parent commands
@@ -26,7 +26,5 @@ Operations specific to Loki datasources such as labels and series.
 ### SEE ALSO
 
 * [grafanactl datasources](grafanactl_datasources.md)	 - Manage Grafana datasources
-* [grafanactl datasources loki labels](grafanactl_datasources_loki_labels.md)	 - List labels or label values
-* [grafanactl datasources loki query](grafanactl_datasources_loki_query.md)	 - Execute a LogQL query against a Loki datasource
-* [grafanactl datasources loki series](grafanactl_datasources_loki_series.md)	 - List log streams
+* [grafanactl datasources tempo query](grafanactl_datasources_tempo_query.md)	 - Execute a Tempo query (not yet available)
 

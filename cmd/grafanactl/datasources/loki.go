@@ -6,7 +6,9 @@ import (
 	"io"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
+	"github.com/grafana/grafanactl/cmd/grafanactl/datasources/query"
 	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
+	internalconfig "github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/query/loki"
 	"github.com/spf13/cobra"
@@ -22,6 +24,7 @@ func lokiCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 	cmd.AddCommand(lokiLabelsCmd(configOpts))
 	cmd.AddCommand(seriesCmd(configOpts))
+	cmd.AddCommand(query.LokiCmd(configOpts))
 
 	return cmd
 }
@@ -80,7 +83,7 @@ func lokiLabelsCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultLokiDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "loki")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-loki-datasource in config")
@@ -204,7 +207,7 @@ func seriesCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultLokiDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "loki")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-loki-datasource in config")

@@ -107,18 +107,18 @@ failed requests.
 grafanactl datasources list -o json
 
 # Error rate trend (visualize to identify onset time)
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
   --from now-2h --to now --step 1m -o graph
 
 # Break down by status code to distinguish error types
-grafanactl query -d <prom-uid> \
-  -e 'sum by(status) (rate(http_requests_total{job="<service>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'sum by(status) (rate(http_requests_total{job="<service>"}[5m]))' \
   --from now-2h --to now --step 1m -o json
 
 # Correlate with logs
-grafanactl query -d <loki-uid> \
-  -e '{job="<service>"} |= "error"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service>"} |= "error"' \
   --from now-2h --to now -o json
 ```
 
@@ -143,18 +143,18 @@ users reporting timeouts.
 **Key queries**:
 ```bash
 # P95 latency trend (visualize to identify onset)
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
   --from now-2h --to now --step 1m -o graph
 
 # Per-endpoint breakdown
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="<service>"}[5m])))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="<service>"}[5m])))' \
   --from now-1h --to now --step 1m -o json
 
 # Log evidence of latency cause
-grafanactl query -d <loki-uid> \
-  -e '{job="<service>"} |~ "timeout|slow query|GC pause|waiting"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service>"} |~ "timeout|slow query|GC pause|waiting"' \
   --from now-2h --to now -o json
 ```
 
@@ -176,18 +176,18 @@ connections) are near capacity limits.
 **Key queries**:
 ```bash
 # CPU saturation
-grafanactl query -d <prom-uid> \
-  -e 'rate(container_cpu_usage_seconds_total{job="<service>"}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(container_cpu_usage_seconds_total{job="<service>"}[5m])' \
   --from now-2h --to now --step 1m -o graph
 
 # Memory utilization
-grafanactl query -d <prom-uid> \
-  -e 'container_memory_working_set_bytes{job="<service>"}' \
+grafanactl datasources prometheus query <prom-uid> \
+  'container_memory_working_set_bytes{job="<service>"}' \
   --from now-2h --to now --step 1m -o graph
 
 # OOM or resource pressure in logs
-grafanactl query -d <loki-uid> \
-  -e '{job="<service>"} |~ "OOM|out of memory|evicted|killed|SIGKILL"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service>"} |~ "OOM|out of memory|evicted|killed|SIGKILL"' \
   --from now-2h --to now -o json
 ```
 
@@ -212,19 +212,19 @@ metrics are absent or flatlined at zero.
 **Key queries**:
 ```bash
 # Check if service is scraping (0 = reachable but failing, absent = not registered)
-grafanactl query -d <prom-uid> -e 'up{job="<service>"}' -o json
+grafanactl datasources prometheus query <prom-uid> 'up{job="<service>"}' -o json
 
 # Check scrape targets
 grafanactl datasources prometheus targets -d <prom-uid> -o json
 
 # Check for recent data (widen window to find the last data point)
-grafanactl query -d <prom-uid> \
-  -e 'absent(up{job="<service>"})' \
+grafanactl datasources prometheus query <prom-uid> \
+  'absent(up{job="<service>"})' \
   --from now-3h --to now --step 5m -o json
 
 # Crash signals in logs
-grafanactl query -d <loki-uid> \
-  -e '{job="<service>"} |~ "panic|crash|OOM|SIGTERM|SIGKILL"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service>"} |~ "panic|crash|OOM|SIGTERM|SIGKILL"' \
   --from now-3h --to now -o json
 ```
 
@@ -296,14 +296,14 @@ Expected output shape:
 }
 ```
 
-Extract the UID values. All subsequent queries use `-d <uid>`, never display
+Extract the UID values. All subsequent queries use the UID as a positional argument, never display
 names.
 
 **Step 2: Visualize error rate trend to find onset time.**
 
 ```bash
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
   --from now-2h --to now --step 1m -o graph
 ```
 
@@ -313,8 +313,8 @@ approximate timestamp — this is the incident start time.
 **Step 3: Break down by status code.**
 
 ```bash
-grafanactl query -d <prom-uid> \
-  -e 'sum by(status) (rate(http_requests_total{job="<service>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'sum by(status) (rate(http_requests_total{job="<service>"}[5m]))' \
   --from now-2h --to now --step 1m -o json
 ```
 
@@ -337,8 +337,8 @@ overload/throttling; 504s point to upstream timeouts.
 **Step 4: Check latency at the same time.**
 
 ```bash
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
   --from now-2h --to now --step 1m -o graph
 ```
 
@@ -348,8 +348,8 @@ If latency rose before errors, the root cause is likely a slow dependency
 **Step 5: Correlate with error logs in the incident window.**
 
 ```bash
-grafanactl query -d <loki-uid> \
-  -e '{job="<service>"} |= "error"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service>"} |= "error"' \
   --from now-2h --to now -o json
 ```
 
@@ -392,8 +392,8 @@ grafanactl datasources list -o json
 **Step 2: Visualize P95 latency trend.**
 
 ```bash
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="checkout"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="checkout"}[5m]))' \
   --from now-3h --to now --step 1m -o graph
 ```
 
@@ -403,8 +403,8 @@ the pre-degradation baseline visible earlier in the graph.
 **Step 3: Break down by endpoint to isolate scope.**
 
 ```bash
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="checkout"}[5m])))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="checkout"}[5m])))' \
   --from now-1h --to now --step 1m -o json
 ```
 
@@ -431,21 +431,21 @@ If one handler is slow: the issue is specific to that route's logic or query.
 
 ```bash
 # CPU saturation
-grafanactl query -d <prom-uid> \
-  -e 'rate(container_cpu_usage_seconds_total{job="checkout"}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(container_cpu_usage_seconds_total{job="checkout"}[5m])' \
   --from now-3h --to now --step 1m -o graph
 
 # Memory pressure
-grafanactl query -d <prom-uid> \
-  -e 'container_memory_working_set_bytes{job="checkout"}' \
+grafanactl datasources prometheus query <prom-uid> \
+  'container_memory_working_set_bytes{job="checkout"}' \
   --from now-3h --to now --step 1m -o json
 ```
 
 **Step 5: Query logs for slow dependency indicators.**
 
 ```bash
-grafanactl query -d <loki-uid> \
-  -e '{job="checkout"} |~ "timeout|slow|waiting|db_query|external"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="checkout"} |~ "timeout|slow|waiting|db_query|external"' \
   --from now-3h --to now -o json
 ```
 
@@ -535,12 +535,12 @@ the full result structure including timestamps, labels, and value arrays.
 ```bash
 # Correct: JSON for data analysis
 grafanactl datasources list -o json
-grafanactl query -d <uid> -e '<expr>' --from now-1h --to now --step 1m -o json
+grafanactl datasources generic query <uid> '<expr>' --from now-1h --to now --step 1m -o json
 grafanactl resources list -o json
 
 # Wrong: text output when you need to extract values
 grafanactl datasources list        # no -o flag produces text
-grafanactl query -d <uid> -e '<expr>'  # incomplete flags
+grafanactl datasources generic query <uid> '<expr>'  # incomplete flags
 ```
 
 ### User-Facing Visualizations: Use `-o graph`
@@ -551,13 +551,13 @@ immediately visible.
 
 ```bash
 # Error rate trend for user presentation
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service>",status=~"5.."}[5m])' \
   --from now-2h --to now --step 1m -o graph
 
 # Latency trend for user presentation
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service>"}[5m]))' \
   --from now-2h --to now --step 1m -o graph
 ```
 
@@ -575,13 +575,13 @@ identifiers.
 grafanactl datasources list -o json
 ```
 
-**Always use `-d <uid>` in query commands:**
+**Always use the UID as a positional argument in query commands:**
 ```bash
 # Correct: UID in -d flag
-grafanactl query -d abc123def456 -e 'up{job="api"}' -o json
+grafanactl datasources generic query abc123def456 'up{job="api"}' -o json
 
 # Wrong: display name (never do this)
-grafanactl query -d "My Prometheus" -e 'up{job="api"}' -o json
+grafanactl datasources generic query "My Prometheus" 'up{job="api"}' -o json
 ```
 
 Store UIDs as variables for multi-step investigations:
@@ -604,14 +604,14 @@ and make it harder to detect when the actual output differs unexpectedly.
 ### Time Range Flags
 
 Always use `--from` and `--to` for time ranges. These are the correct flags
-for `grafanactl query`. Do not use `--start`/`--end` (those are not valid).
+for `grafanactl datasources {kind} query`. Do not use `--start`/`--end` (those are not valid).
 
 ```bash
 # Correct
-grafanactl query -d <uid> -e '<expr>' --from now-1h --to now --step 1m -o json
+grafanactl datasources generic query <uid> '<expr>' --from now-1h --to now --step 1m -o json
 
 # Wrong
-grafanactl query -d <uid> -e '<expr>' --start now-1h --end now   # invalid flags
+grafanactl datasources generic query <uid> '<expr>' --start now-1h --end now   # invalid flags
 ```
 
 Relative time formats supported: `now`, `now-Xm`, `now-Xh`, `now-Xd`.

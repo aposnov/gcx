@@ -101,29 +101,29 @@ grafanactl datasources list --type prometheus
 
 Run per-probe success rate to pinpoint failing probes:
 ```bash
-grafanactl query -d <datasource-uid> \
-  -e 'avg by (probe) (probe_success{job="<job>",instance="<target>"})' \
+grafanactl datasources prometheus query <datasource-uid> \
+  'avg by (probe) (probe_success{job="<job>",instance="<target>"})' \
   --from now-1h --to now --step 1m -o json
 ```
 
 Show as graph for the user:
 ```bash
-grafanactl query -d <datasource-uid> \
-  -e 'avg by (probe) (probe_success{job="<job>",instance="<target>"})' \
+grafanactl datasources prometheus query <datasource-uid> \
+  'avg by (probe) (probe_success{job="<job>",instance="<target>"})' \
   --from now-1h --to now --step 1m -o graph
 ```
 
 For HTTP checks, also run HTTP phase latency to locate where time is spent:
 ```bash
-grafanactl query -d <datasource-uid> \
-  -e 'avg by (phase) (probe_http_duration_seconds{job="<job>",instance="<target>"})' \
+grafanactl datasources prometheus query <datasource-uid> \
+  'avg by (phase) (probe_http_duration_seconds{job="<job>",instance="<target>"})' \
   --from now-1h --to now --step 1m -o graph
 ```
 
 For SSL/TLS failures or near-expiry concerns:
 ```bash
-grafanactl query -d <datasource-uid> \
-  -e '(probe_ssl_earliest_cert_expiry{job="<job>",instance="<target>"} - time()) / 86400' \
+grafanactl datasources prometheus query <datasource-uid> \
+  '(probe_ssl_earliest_cert_expiry{job="<job>",instance="<target>"} - time()) / 86400' \
   --from now-1h --to now --step 5m -o json
 ```
 
@@ -210,6 +210,6 @@ Use minimal formatting. Avoid excessive bold text. Trust the user to prioritize.
 
 - `grafanactl synth checks status` returns no rows: check ID may be wrong — list all checks and confirm
 - `grafanactl synth probes list` fails: skip geographic mapping; classify probes by name where possible
-- `grafanactl query` fails with datasource error: note it, skip PromQL steps, classify using timeline data only
+- `grafanactl datasources {kind} query` fails with datasource error: note it, skip PromQL steps, classify using timeline data only
 - Multiple checks match the search name: list all with IDs and targets, ask which to investigate
 - Timeline returns no data for the window: widen to `--from now-6h --to now` before concluding NODATA

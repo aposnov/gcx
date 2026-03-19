@@ -217,7 +217,7 @@ The `series` command supports **label selectors only**, not full LogQL features:
 - Line filters: `{job="varlogs"} |~ "error.*"` (not supported)
 - Metrics: `rate({job="varlogs"}[5m])` (not supported)
 
-For these advanced features, use the full `grafanactl query` command with LogQL queries (when Loki query support is added).
+For these advanced features, use `grafanactl datasources loki query <uid> '<logql>'` to run full LogQL queries against a Loki datasource.
 
 ## Regex Syntax
 

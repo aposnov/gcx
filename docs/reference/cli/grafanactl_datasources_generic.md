@@ -1,15 +1,15 @@
-## grafanactl datasources loki
+## grafanactl datasources generic
 
-Loki datasource operations
+Generic datasource operations (auto-detects type)
 
 ### Synopsis
 
-Operations specific to Loki datasources such as labels and series.
+Operations for any datasource type. The datasource type is auto-detected via the Grafana API.
 
 ### Options
 
 ```
-  -h, --help   help for loki
+  -h, --help   help for generic
 ```
 
 ### Options inherited from parent commands
@@ -26,7 +26,5 @@ Operations specific to Loki datasources such as labels and series.
 ### SEE ALSO
 
 * [grafanactl datasources](grafanactl_datasources.md)	 - Manage Grafana datasources
-* [grafanactl datasources loki labels](grafanactl_datasources_loki_labels.md)	 - List labels or label values
-* [grafanactl datasources loki query](grafanactl_datasources_loki_query.md)	 - Execute a LogQL query against a Loki datasource
-* [grafanactl datasources loki series](grafanactl_datasources_loki_series.md)	 - List log streams
+* [grafanactl datasources generic query](grafanactl_datasources_generic_query.md)	 - Execute a query against any datasource (auto-detects type)
 

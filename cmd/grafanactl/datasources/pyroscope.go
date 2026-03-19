@@ -6,7 +6,9 @@ import (
 	"io"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
+	"github.com/grafana/grafanactl/cmd/grafanactl/datasources/query"
 	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
+	internalconfig "github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/query/pyroscope"
 	"github.com/spf13/cobra"
@@ -22,6 +24,7 @@ func pyroscopeCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 	cmd.AddCommand(profileTypesCmd(configOpts))
 	cmd.AddCommand(pyroscopeLabelsCmd(configOpts))
+	cmd.AddCommand(query.PyroscopeCmd(configOpts))
 
 	return cmd
 }
@@ -74,7 +77,7 @@ func profileTypesCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultPyroscopeDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "pyroscope")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-pyroscope-datasource in config")
@@ -177,7 +180,7 @@ func pyroscopeLabelsCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultPyroscopeDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "pyroscope")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-pyroscope-datasource in config")

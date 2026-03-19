@@ -92,8 +92,8 @@ cmd/grafanactl/
 ├── config/      Config management commands (set, use-context, view...)
 ├── resources/   Resource commands (get, schemas, push, pull, delete, edit, validate)
 ├── dashboards/  Dashboard commands (snapshot via Image Renderer)
-├── datasources/ Datasource commands (list, get, prometheus, loki)
-├── query/       Query execution command (PromQL/LogQL with graph output)
+├── datasources/ Datasource commands (list, get, prometheus, loki, pyroscope, tempo, generic)
+│   └── query/   Query subcommand shared infrastructure (codecs, time parsing, per-kind constructors)
 ├── providers/   Provider list command
 ├── api/         Raw API passthrough command (direct Grafana API calls)
 ├── linter/      Linting commands (run, new, rules, test — mounted under dev lint)

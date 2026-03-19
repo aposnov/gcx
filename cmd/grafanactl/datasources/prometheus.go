@@ -7,7 +7,9 @@ import (
 	"text/tabwriter"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
+	"github.com/grafana/grafanactl/cmd/grafanactl/datasources/query"
 	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
+	internalconfig "github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
 	"github.com/spf13/cobra"
@@ -24,6 +26,7 @@ func prometheusCmd(configOpts *cmdconfig.Options) *cobra.Command {
 	cmd.AddCommand(labelsCmd(configOpts))
 	cmd.AddCommand(metadataCmd(configOpts))
 	cmd.AddCommand(targetsCmd(configOpts))
+	cmd.AddCommand(query.PrometheusCmd(configOpts))
 
 	return cmd
 }
@@ -83,7 +86,7 @@ func labelsCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultPrometheusDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "prometheus")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-prometheus-datasource in config")
@@ -199,7 +202,7 @@ func metadataCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultPrometheusDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "prometheus")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-prometheus-datasource in config")
@@ -316,7 +319,7 @@ func targetsCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				datasourceUID = fullCfg.GetCurrentContext().DefaultPrometheusDatasource
+				datasourceUID = internalconfig.DefaultDatasourceUID(*fullCfg.GetCurrentContext(), "prometheus")
 			}
 			if datasourceUID == "" {
 				return errors.New("datasource UID is required: use -d flag or set default-prometheus-datasource in config")

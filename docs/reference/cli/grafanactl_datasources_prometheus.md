@@ -28,5 +28,6 @@ Operations specific to Prometheus datasources such as labels, metadata, and targ
 * [grafanactl datasources](grafanactl_datasources.md)	 - Manage Grafana datasources
 * [grafanactl datasources prometheus labels](grafanactl_datasources_prometheus_labels.md)	 - List labels or label values
 * [grafanactl datasources prometheus metadata](grafanactl_datasources_prometheus_metadata.md)	 - Get metric metadata
+* [grafanactl datasources prometheus query](grafanactl_datasources_prometheus_query.md)	 - Execute a PromQL query against a Prometheus datasource
 * [grafanactl datasources prometheus targets](grafanactl_datasources_prometheus_targets.md)	 - List scrape targets
 

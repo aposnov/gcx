@@ -22,6 +22,8 @@ func Command() *cobra.Command {
 	cmd.AddCommand(prometheusCmd(configOpts))
 	cmd.AddCommand(lokiCmd(configOpts))
 	cmd.AddCommand(pyroscopeCmd(configOpts))
+	cmd.AddCommand(tempoCmd())
+	cmd.AddCommand(genericCmd(configOpts))
 
 	return cmd
 }

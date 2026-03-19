@@ -71,10 +71,10 @@ Once you've identified available data, verify with a test query.
 
 ```bash
 # For Prometheus - instant query
-grafanactl query -d <datasource-uid> -e 'up'
+grafanactl datasources prometheus query <datasource-uid> 'up'
 
 # For Prometheus - range query
-grafanactl query -d <datasource-uid> -e 'rate(http_requests_total[5m])' --start now-1h --end now
+grafanactl datasources prometheus query <datasource-uid> 'rate(http_requests_total[5m])' --from now-1h --to now
 ```
 
 **Expected output:** Table showing metric values with labels and timestamps.
@@ -130,7 +130,7 @@ After setting defaults, you can omit the `-d` flag in datasource commands.
    - Prometheus: `grafanactl datasources prometheus targets -d <uid>`
    - Look for service in scrape targets
 3. Verify labels exist: `grafanactl datasources prometheus labels -d <uid> --label job`
-4. Test simple query: `grafanactl query -d <uid> -e 'up{job="service-x"}'`
+4. Test simple query: `grafanactl datasources prometheus query <uid> 'up{job="service-x"}'`
 
 **Result:** Identifies whether datasource is misconfigured, service isn't being scraped, or label selectors are wrong.
 

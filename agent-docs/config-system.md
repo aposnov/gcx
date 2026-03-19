@@ -33,8 +33,10 @@ Config
     │   │       ├── KeyData     []byte
     │   │       ├── CAData      []byte
     │   │       └── NextProtos  []string
-    │   ├── DefaultPrometheusDatasource  ""   // UID of default Prometheus datasource for queries
-    │   ├── DefaultLokiDatasource        ""   // UID of default Loki datasource for queries
+    │   ├── Datasources                  {}   // map[kind→uid]: default datasource per kind (takes precedence over legacy keys below)
+    │   ├── DefaultPrometheusDatasource  ""   // UID of default Prometheus datasource (legacy — use Datasources["prometheus"] instead)
+    │   ├── DefaultLokiDatasource        ""   // UID of default Loki datasource (legacy — use Datasources["loki"] instead)
+    │   ├── DefaultPyroscopeDatasource   ""   // UID of default Pyroscope datasource (legacy — use Datasources["pyroscope"] instead)
     │   └── Providers  map[string]map[string]string
     │       ├── "slo"       {"url": "...", "token": "..."}   // secret keys REDACTED in config view
     │       └── "oncall"    {"url": "..."}

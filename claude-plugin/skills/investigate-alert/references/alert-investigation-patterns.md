@@ -105,11 +105,13 @@ For P99/P95 latency alerts:
 
 ```bash
 # Current latency percentiles
-grafanactl query -d <uid> -e 'histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))' \
+grafanactl datasources prometheus query <uid> \
+  'histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))' \
   --from now-1h --to now --step 1m -o graph
 
 # Latency by endpoint
-grafanactl query -d <uid> -e 'histogram_quantile(0.99, sum by(job, handler) (rate(http_request_duration_seconds_bucket[5m])))' \
+grafanactl datasources prometheus query <uid> \
+  'histogram_quantile(0.99, sum by(job, handler) (rate(http_request_duration_seconds_bucket[5m])))' \
   --from now-1h --to now --step 1m -o json
 ```
 
@@ -119,11 +121,13 @@ For alerts on HTTP 5xx or error rates:
 
 ```bash
 # Overall error rate
-grafanactl query -d <uid> -e 'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])' \
+grafanactl datasources prometheus query <uid> \
+  'rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])' \
   --from now-1h --to now --step 1m -o graph
 
 # Error rate by service
-grafanactl query -d <uid> -e 'sum by(job) (rate(http_requests_total{status=~"5.."}[5m])) / sum by(job) (rate(http_requests_total[5m]))' \
+grafanactl datasources prometheus query <uid> \
+  'sum by(job) (rate(http_requests_total{status=~"5.."}[5m])) / sum by(job) (rate(http_requests_total[5m]))' \
   --from now-1h --to now --step 1m -o json
 ```
 
@@ -133,15 +137,18 @@ For CPU, memory, or disk alerts:
 
 ```bash
 # CPU usage by pod
-grafanactl query -d <uid> -e 'sum by(pod) (rate(container_cpu_usage_seconds_total[5m]))' \
+grafanactl datasources prometheus query <uid> \
+  'sum by(pod) (rate(container_cpu_usage_seconds_total[5m]))' \
   --from now-1h --to now --step 1m -o graph
 
 # Memory usage
-grafanactl query -d <uid> -e 'container_memory_working_set_bytes{container!=""}' \
+grafanactl datasources prometheus query <uid> \
+  'container_memory_working_set_bytes{container!=""}' \
   --from now-30m --to now --step 1m -o json
 
 # Disk free percentage
-grafanactl query -d <uid> -e 'node_filesystem_avail_bytes / node_filesystem_size_bytes' \
+grafanactl datasources prometheus query <uid> \
+  'node_filesystem_avail_bytes / node_filesystem_size_bytes' \
   --from now-6h --to now --step 5m -o graph
 ```
 
@@ -151,7 +158,8 @@ For cert expiry alerts:
 
 ```bash
 # Days until certificate expiry
-grafanactl query -d <uid> -e '(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400' \
+grafanactl datasources prometheus query <uid> \
+  '(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400' \
   --from now-1h --to now --step 10m -o json
 ```
 
@@ -161,11 +169,13 @@ For availability or SLO breach alerts:
 
 ```bash
 # Uptime over last hour
-grafanactl query -d <uid> -e 'avg_over_time(up[1h])' \
+grafanactl datasources prometheus query <uid> \
+  'avg_over_time(up[1h])' \
   --from now-6h --to now --step 5m -o graph
 
 # Current up/down status
-grafanactl query -d <uid> -e 'up == 0' \
+grafanactl datasources prometheus query <uid> \
+  'up == 0' \
   --from now-15m --to now --step 1m -o json
 ```
 
@@ -177,15 +187,15 @@ After identifying an issue from metrics, correlate with logs:
 
 ```bash
 # Find error logs for a service
-grafanactl query -d <loki-uid> -e '{job="api-server"} |= "error"' \
+grafanactl datasources loki query <loki-uid> '{job="api-server"} |= "error"' \
   --from now-1h --to now -o json
 
 # Find logs around the time the alert started firing (replace timestamp)
-grafanactl query -d <loki-uid> -e '{namespace="production"} |= "error"' \
+grafanactl datasources loki query <loki-uid> '{namespace="production"} |= "error"' \
   --from 2024-01-15T10:00:00Z --to 2024-01-15T10:30:00Z -o json
 
 # Rate of error log lines (for trend analysis)
-grafanactl query -d <loki-uid> -e 'rate({job="api-server"} |= "error" [5m])' \
+grafanactl datasources loki query <loki-uid> 'rate({job="api-server"} |= "error" [5m])' \
   --from now-2h --to now --step 1m -o graph
 ```
 
@@ -195,12 +205,12 @@ Loki metric queries (`rate()`, `count_over_time()`, etc.) produce one series per
 
 ```bash
 # BAD — one series per pod/namespace/level/... combination
-grafanactl query -d <loki-uid> -e 'count_over_time({job="app"} [5m])'
+grafanactl datasources loki query <loki-uid> 'count_over_time({job="app"} [5m])'
 
 # GOOD — aggregate down to what you need
-grafanactl query -d <loki-uid> -e 'sum(count_over_time({job="app"} [5m]))'
-grafanactl query -d <loki-uid> -e 'sum by(level) (count_over_time({job="app"} | json [5m]))'
-grafanactl query -d <loki-uid> -e 'topk(10, sum by(pod) (rate({job="app"} [5m])))'
+grafanactl datasources loki query <loki-uid> 'sum(count_over_time({job="app"} [5m]))'
+grafanactl datasources loki query <loki-uid> 'sum by(level) (count_over_time({job="app"} | json [5m]))'
+grafanactl datasources loki query <loki-uid> 'topk(10, sum by(pod) (rate({job="app"} [5m])))'
 ```
 
 Rule of thumb: if your query uses `rate()`, `count_over_time()`, or `bytes_over_time()`, wrap it with `sum()`, `sum by(label)`, or `topk()`.
@@ -239,7 +249,7 @@ Common mistakes:
 Use `-o json` after `-o graph` to extract exact values:
 ```bash
 # Get the peak value during the alert window
-grafanactl query -d <uid> -e '<query>' --from now-2h --to now --step 1m -o json | \
+grafanactl datasources prometheus query <uid> '<query>' --from now-2h --to now --step 1m -o json | \
   jq '[.data[].values[] | .value] | max'
 ```
 

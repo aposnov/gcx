@@ -273,40 +273,49 @@ backing client is a REST adapter or the k8s dynamic client.
 
 ## 5. QUERY Pipeline
 
-Entry point: `cmd/grafanactl/query/command.go` (`RunE` closure in `Command()`).
+Entry point: `cmd/grafanactl/datasources/query/` package — per-kind constructors wired under each kind's subgroup (`datasources prometheus query`, `datasources loki query`, etc.).
 
 ```
 User invocation:
-  grafanactl query -d <uid> -e 'rate(http_requests_total[5m])' --start now-1h --end now --step 1m
+  grafanactl datasources prometheus query <uid> 'rate(http_requests_total[5m])' --from now-1h --to now --step 1m
 
   ┌──────────────────────────────────────────────────────────────────────┐
-  │ 1. Parse flags                                                        │
-  │    --expr / -e      PromQL or LogQL expression (required)            │
-  │    --type / -t      datasource type: "prometheus" (default) or "loki"│
-  │    --datasource/-d  datasource UID (optional if default configured)  │
-  │    --start / --end  time bounds (RFC3339, Unix epoch, or relative    │
+  │ 1. Parse args and flags                                               │
+  │    [DATASOURCE_UID] EXPR   positional args (UID optional for typed   │
+  │                            subcommands when config default is set)   │
+  │    --from / --to    time bounds (RFC3339, Unix epoch, or relative    │
   │                     e.g. "now-1h", "now")                            │
+  │    --window         convenience: sets --from=now-{window} --to=now   │
+  │                     (mutually exclusive with --from/--to)            │
   │    --step           query step / interval (e.g. "15s", "1m")         │
+  │    --limit          max log lines returned (loki and generic only;   │
+  │                     default 1000; 0 = no limit)                      │
+  │    --profile-type   required for pyroscope; also on generic          │
   │    -o               output format: table (default), graph, json, yaml│
   └───────────────────────┬──────────────────────────────────────────────┘
                           │
   ┌───────────────────────▼──────────────────────────────────────────────┐
   │ 2. Resolve datasource UID                                             │
-  │    if -d flag provided → use directly                                │
-  │    else load full config:                                             │
-  │      if type == "loki"       → ctx.DefaultLokiDatasource             │
-  │      else (prometheus)       → ctx.DefaultPrometheusDatasource       │
-  │    error if still empty                                               │
+  │    Typed subcommands (prometheus/loki/pyroscope):                    │
+  │      if UID positional arg provided → use directly                   │
+  │      else → config.DefaultDatasourceUID(ctx, kind):                  │
+  │        (1) ctx.Datasources[kind]         ← new config section        │
+  │        (2) ctx.DefaultPrometheusDatasource / DefaultLokiDatasource   │
+  │            / DefaultPyroscopeDatasource  ← legacy fallback           │
+  │      error if still empty                                             │
+  │    generic subcommand:                                               │
+  │      UID positional arg required (no default resolution)             │
   └───────────────────────┬──────────────────────────────────────────────┘
                           │
   ┌───────────────────────▼──────────────────────────────────────────────┐
   │ 3. Parse time range                                                   │
-  │    ParseTime(opts.Start, now) → time.Time (zero if empty)            │
-  │    ParseTime(opts.End, now)   → time.Time (zero if empty)            │
-  │    ParseDuration(opts.Step)   → time.Duration (zero if empty)        │
+  │    ParseTime(opts.From, now) → time.Time (zero if empty)             │
+  │    ParseTime(opts.To, now)   → time.Time (zero if empty)             │
+  │    ParseDuration(opts.Step)  → time.Duration (zero if empty)         │
+  │    --window already resolved to From/To by Validate() before RunE   │
   │                                                                       │
-  │    IsRange() = Start != zero && End != zero                          │
-  │    Instant query: no --start/--end flags → uses "now-1m" to "now"   │
+  │    IsRange() = From != zero && To != zero                            │
+  │    Instant query: no --from/--to flags → uses "now-1m" to "now"     │
   │    Range query: explicit time bounds + optional step                 │
   └───────────────────────┬──────────────────────────────────────────────┘
                           │
@@ -385,9 +394,12 @@ User invocation:
 ```
 
 Key files:
-- `cmd/grafanactl/query/command.go` — CLI wiring, datasource resolution, dispatch
-- `cmd/grafanactl/query/graph.go` — `queryGraphCodec` (bridges query response → chart)
-- `cmd/grafanactl/query/time.go` — `ParseTime`, `ParseDuration` for flag parsing
+- `cmd/grafanactl/datasources/query/query.go` — shared opts, `resolveTypedArgs`, `validateDatasourceType`
+- `cmd/grafanactl/datasources/query/{prometheus,loki,pyroscope,tempo,generic}.go` — per-kind constructors (`PrometheusCmd`, `LokiCmd`, etc.)
+- `cmd/grafanactl/datasources/query/codecs.go` — `queryTableCodec`, `queryGraphCodec` (codec registry)
+- `cmd/grafanactl/datasources/query/time.go` — `ParseTime`, `ParseDuration` for flag parsing
+- `cmd/grafanactl/datasources/{prometheus,loki,pyroscope,tempo,generic}.go` — kind subgroups that wire in the query constructors
+- `internal/config/resolver.go` — `DefaultDatasourceUID(ctx, kind)` — shared 2-tier UID resolution
 - `internal/query/prometheus/client.go` — HTTP client, request construction, response conversion
 - `internal/query/prometheus/formatter.go` — table rendering (vector/matrix/scalar)
 - `internal/query/loki/client.go` — HTTP client, request construction, response conversion

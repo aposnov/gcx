@@ -93,13 +93,13 @@ grafanactl datasources list --type prometheus
 
 ```bash
 # Success rate by dimension (e.g., cluster, status_code, endpoint)
-grafanactl query -d <datasource-uid> \
-  -e 'sum by (<groupByLabel>) (rate(<successMetric>[5m])) / sum by (<groupByLabel>) (rate(<totalMetric>[5m]))' \
+grafanactl datasources prometheus query <datasource-uid> \
+  'sum by (<groupByLabel>) (rate(<successMetric>[5m])) / sum by (<groupByLabel>) (rate(<totalMetric>[5m]))' \
   --from now-1h --to now --step 1m
 
 # Error rate by dimension to spot the bad actor
-grafanactl query -d <datasource-uid> \
-  -e 'sum by (<groupByLabel>) (rate(<totalMetric>[5m])) - sum by (<groupByLabel>) (rate(<successMetric>[5m]))' \
+grafanactl datasources prometheus query <datasource-uid> \
+  'sum by (<groupByLabel>) (rate(<totalMetric>[5m])) - sum by (<groupByLabel>) (rate(<successMetric>[5m]))' \
   --from now-1h --to now --step 1m
 ```
 
@@ -108,13 +108,13 @@ If `groupByLabels` is empty, try common dimensions: `cluster`, `namespace`, `ser
 **For freeform queries** — use the raw PromQL expression and add `by (<label>)` grouping:
 
 ```bash
-grafanactl query -d <datasource-uid> \
-  -e '<freeform_expression> by (cluster)' \
+grafanactl datasources prometheus query <datasource-uid> \
+  '<freeform_expression> by (cluster)' \
   --from now-1h --to now --step 1m
 
 # Also try other likely breakdown dimensions
-grafanactl query -d <datasource-uid> \
-  -e '<freeform_expression> by (namespace)' \
+grafanactl datasources prometheus query <datasource-uid> \
+  '<freeform_expression> by (namespace)' \
   --from now-1h --to now --step 1m
 ```
 
@@ -185,8 +185,8 @@ Next actions:
 
 - **grafanactl slo definitions get fails with 404**: SLO UUID not found. Run `grafanactl slo definitions list` and confirm the UUID.
 - **grafanactl slo definitions status returns empty**: No status available — SLO may be newly created. Check if recording rules are running (STATUS may show NODATA).
-- **grafanactl query fails with datasource error**: Datasource UID may be wrong. Run `grafanactl datasources list --type prometheus` to find the correct UID.
-- **grafanactl query returns no data**: The SLO metrics may write to a separate datasource (check `.spec.destinationDatasource.uid`). Try both the destination datasource and the default Prometheus datasource.
+- **grafanactl datasources {kind} query fails with datasource error**: Datasource UID may be wrong. Run `grafanactl datasources list --type prometheus` to find the correct UID.
+- **grafanactl datasources {kind} query returns no data**: The SLO metrics may write to a separate datasource (check `.spec.destinationDatasource.uid`). Try both the destination datasource and the default Prometheus datasource.
 - **alert rules list returns empty**: Alert rules may be in a different folder. Try without filters: `grafanactl alert rules list -o json | jq length` to confirm total count.
 - **gh api fails**: If `gh` is not authenticated or unavailable, report the runbook URL directly and skip content fetching.
 - **SLO has no groupByLabels (ratio query)**: Try common breakdown dimensions: `cluster`, `namespace`, `service`, `endpoint`, `status_code`. Report which ones return data.

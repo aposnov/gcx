@@ -15,7 +15,6 @@ import (
 	"github.com/grafana/grafanactl/cmd/grafanactl/datasources"
 	"github.com/grafana/grafanactl/cmd/grafanactl/dev"
 	cmdproviders "github.com/grafana/grafanactl/cmd/grafanactl/providers"
-	"github.com/grafana/grafanactl/cmd/grafanactl/query"
 	"github.com/grafana/grafanactl/cmd/grafanactl/resources"
 	"github.com/grafana/grafanactl/internal/agent"
 	"github.com/grafana/grafanactl/internal/logs"
@@ -124,7 +123,6 @@ func newCommand(version string, pp []providers.Provider) *cobra.Command {
 	rootCmd.AddCommand(dashboards.Command())
 	rootCmd.AddCommand(dev.Command())
 	rootCmd.AddCommand(datasources.Command())
-	rootCmd.AddCommand(query.Command())
 	rootCmd.AddCommand(resources.Command())
 
 	rootCmd.AddCommand(cmdproviders.Command(pp))

@@ -263,7 +263,8 @@ terminal charts (`internal/graph`). The `query` command registers custom codecs
 **Evidence:**
 - `internal/query/prometheus/client.go`: `NewClient` calls `rest.HTTPClientFor`
 - `internal/query/loki/client.go`: same pattern
-- `cmd/grafanactl/query/command.go`: codec registration and datasource-type dispatch
+- `cmd/grafanactl/datasources/query/codecs.go`: `queryTableCodec`, `queryGraphCodec` registration — shared by all per-kind query subcommands
+- `cmd/grafanactl/datasources/query/{prometheus,loki,pyroscope,tempo,generic}.go`: per-kind constructors wired under `datasources {kind} query`
 - `internal/graph/chart.go`: `RenderChart` auto-selects line vs bar chart
 
 ---
@@ -290,7 +291,7 @@ only the wide table codec was expected to display.
 
 **Evidence:**
 - `internal/providers/slo/definitions/status.go`: `fetchMetrics` fetches all metrics unconditionally
-- `cmd/grafanactl/query/command.go`: query response passed to all codecs unchanged
+- `cmd/grafanactl/datasources/query/query.go`: query response passed to all codecs unchanged
 - `cmd/grafanactl/io/format.go`: built-in JSON/YAML codecs fall through when no custom codec is registered
 
 ---

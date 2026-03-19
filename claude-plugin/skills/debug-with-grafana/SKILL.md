@@ -73,7 +73,7 @@ grafanactl datasources loki labels -d <loki-uid> -l job -o json
 grafanactl datasources loki series -d <loki-uid> -M '{job="<service-name>"}' -o json
 
 # Spot-check: confirm uptime metrics are present for the service
-grafanactl query -d <prom-uid> -e 'up{job="<service-name>"}' -o json
+grafanactl datasources prometheus query <prom-uid> 'up{job="<service-name>"}' -o json
 ```
 
 **Expected output shape:**
@@ -100,23 +100,23 @@ whether an error spike exists and when it began.
 
 ```bash
 # HTTP 5xx error rate (range query for trend)
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m])' \
   --from now-1h --to now --step 1m -o json
 
 # Visualize the trend
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m])' \
   --from now-1h --to now --step 1m -o graph
 
 # Error ratio (errors / total)
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m]) / rate(http_requests_total{job="<service-name>"}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="<service-name>",status=~"5.."}[5m]) / rate(http_requests_total{job="<service-name>"}[5m])' \
   --from now-1h --to now --step 1m -o json
 
 # Break down by status code to identify 500 vs 503 vs 504
-grafanactl query -d <prom-uid> \
-  -e 'sum by(status) (rate(http_requests_total{job="<service-name>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'sum by(status) (rate(http_requests_total{job="<service-name>"}[5m]))' \
   --from now-1h --to now --step 1m -o json
 ```
 
@@ -146,23 +146,23 @@ or failing fast (error issue). High latency often precedes error spikes.
 
 ```bash
 # P50/P95/P99 latency from histogram
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m]))' \
   --from now-1h --to now --step 1m -o json
 
 # Visualize P95 latency trend
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m]))' \
   --from now-1h --to now --step 1m -o graph
 
 # Average latency as a simpler signal if histograms are unavailable
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_request_duration_seconds_sum{job="<service-name>"}[5m]) / rate(http_request_duration_seconds_count{job="<service-name>"}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_request_duration_seconds_sum{job="<service-name>"}[5m]) / rate(http_request_duration_seconds_count{job="<service-name>"}[5m])' \
   --from now-1h --to now --step 1m -o json
 
 # Latency by endpoint (if label available)
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m])))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="<service-name>"}[5m])))' \
   --from now-1h --to now --step 1m -o json
 ```
 
@@ -193,23 +193,23 @@ metrics cannot.
 
 ```bash
 # Error logs for the service in the incident window
-grafanactl query -d <loki-uid> \
-  -e '{job="<service-name>"} |= "error"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service-name>"} |= "error"' \
   --from now-1h --to now -o json
 
 # JSON-parsed logs with level filter (if structured logging)
-grafanactl query -d <loki-uid> \
-  -e '{job="<service-name>"} | json | level="error"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service-name>"} | json | level="error"' \
   --from now-1h --to now -o json
 
 # Error rate from logs (count over time)
-grafanactl query -d <loki-uid> \
-  -e 'count_over_time({job="<service-name>"} |= "error" [5m])' \
+grafanactl datasources loki query <loki-uid> \
+  'count_over_time({job="<service-name>"} |= "error" [5m])' \
   --from now-1h --to now --step 1m -o json
 
 # Grep for specific error patterns
-grafanactl query -d <loki-uid> \
-  -e '{job="<service-name>"} |~ "timeout|connection refused|OOM|panic"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="<service-name>"} |~ "timeout|connection refused|OOM|panic"' \
   --from now-1h --to now -o json
 ```
 
@@ -346,26 +346,26 @@ grafanactl datasources list -t prometheus -o json
 grafanactl datasources list -t loki -o json
 
 # Step 2: Confirm service is being scraped
-grafanactl query -d <prom-uid> -e 'up{job="api"}' -o json
+grafanactl datasources prometheus query <prom-uid> 'up{job="api"}' -o json
 
 # Step 3: Observe error rate over last 2 hours (wider window to see the spike start)
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="api",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="api",status=~"5.."}[5m])' \
   --from now-2h --to now --step 1m -o graph
 
 # Identify which status codes are elevated
-grafanactl query -d <prom-uid> \
-  -e 'sum by(status) (rate(http_requests_total{job="api"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'sum by(status) (rate(http_requests_total{job="api"}[5m]))' \
   --from now-2h --to now --step 1m -o json
 
 # Step 4: Check if latency rose at the same time
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
   --from now-2h --to now --step 1m -o graph
 
 # Step 5: Get error logs in the spike window
-grafanactl query -d <loki-uid> \
-  -e '{job="api"} |= "error"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="api"} |= "error"' \
   --from now-2h --to now -o json
 
 # Step 6: Check alert rules
@@ -404,31 +404,31 @@ increasing from baseline. Match this to log timestamps in Step 5.
 grafanactl datasources list -t prometheus -o json
 
 # Step 2: Confirm service health (latency without errors suggests slow dependency)
-grafanactl query -d <prom-uid> -e 'up{job="api"}' -o json
+grafanactl datasources prometheus query <prom-uid> 'up{job="api"}' -o json
 
 # Step 3: Error rate (confirm it's not elevated yet)
-grafanactl query -d <prom-uid> \
-  -e 'rate(http_requests_total{job="api",status=~"5.."}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(http_requests_total{job="api",status=~"5.."}[5m])' \
   --from now-1h --to now --step 1m -o json
 
 # Step 4: P95 latency is the primary signal — visualize trend
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
   --from now-2h --to now --step 1m -o graph
 
 # Break down by endpoint to isolate which routes are slow
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="api"}[5m])))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, sum by(le, handler) (rate(http_request_duration_seconds_bucket{job="api"}[5m])))' \
   --from now-1h --to now --step 1m -o json
 
 # Step 5: Check for timeout log patterns suggesting upstream dependency issue
-grafanactl query -d <loki-uid> \
-  -e '{job="api"} |~ "timeout|slow|waiting"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="api"} |~ "timeout|slow|waiting"' \
   --from now-2h --to now -o json
 
 # Check database or downstream service latency if metrics available
-grafanactl query -d <prom-uid> \
-  -e 'rate(db_query_duration_seconds_sum{job="api"}[5m]) / rate(db_query_duration_seconds_count{job="api"}[5m])' \
+grafanactl datasources prometheus query <prom-uid> \
+  'rate(db_query_duration_seconds_sum{job="api"}[5m]) / rate(db_query_duration_seconds_count{job="api"}[5m])' \
   --from now-2h --to now --step 1m -o json
 ```
 
@@ -469,29 +469,29 @@ grafanactl datasources prometheus targets -d <prom-uid> -o json | \
   jq '.[] | select(.labels.job == "api")'
 
 # Confirm up metric — value "0" means scrape failure, absent means not scraped
-grafanactl query -d <prom-uid> -e 'up{job="api"}' -o json
+grafanactl datasources prometheus query <prom-uid> 'up{job="api"}' -o json
 
 # Check if the job label exists at all (absence = service was never registered)
 grafanactl datasources prometheus labels -d <prom-uid> -l job -o json
 
 # Step 3: Without error rate data, check for recent data gaps
-grafanactl query -d <prom-uid> \
-  -e 'absent(up{job="api"})' \
+grafanactl datasources prometheus query <prom-uid> \
+  'absent(up{job="api"})' \
   --from now-1h --to now --step 1m -o json
 
 # Step 4: Query latency from any recent data before the outage
-grafanactl query -d <prom-uid> \
-  -e 'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
+grafanactl datasources prometheus query <prom-uid> \
+  'histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api"}[5m]))' \
   --from now-3h --to now --step 5m -o graph
 
 # Step 5: Check Loki for last known logs before data disappeared
-grafanactl query -d <loki-uid> \
-  -e '{job="api"}' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="api"}' \
   --from now-3h --to now -o json
 
 # Crash or OOM signals in logs
-grafanactl query -d <loki-uid> \
-  -e '{job="api"} |~ "panic|OOM|killed|crashed|SIGTERM"' \
+grafanactl datasources loki query <loki-uid> \
+  '{job="api"} |~ "panic|OOM|killed|crashed|SIGTERM"' \
   --from now-3h --to now -o json
 
 # Step 6: Check alert rules for any firing service-down alerts

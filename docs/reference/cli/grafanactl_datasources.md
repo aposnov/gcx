@@ -26,9 +26,11 @@ List and get information about Grafana datasources.
 ### SEE ALSO
 
 * [grafanactl](grafanactl.md)	 - 
+* [grafanactl datasources generic](grafanactl_datasources_generic.md)	 - Generic datasource operations (auto-detects type)
 * [grafanactl datasources get](grafanactl_datasources_get.md)	 - Get details of a specific datasource
 * [grafanactl datasources list](grafanactl_datasources_list.md)	 - List all datasources
 * [grafanactl datasources loki](grafanactl_datasources_loki.md)	 - Loki datasource operations
 * [grafanactl datasources prometheus](grafanactl_datasources_prometheus.md)	 - Prometheus datasource operations
 * [grafanactl datasources pyroscope](grafanactl_datasources_pyroscope.md)	 - Pyroscope datasource operations
+* [grafanactl datasources tempo](grafanactl_datasources_tempo.md)	 - Tempo datasource operations
 

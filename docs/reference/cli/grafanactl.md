@@ -21,7 +21,6 @@
 * [grafanactl datasources](grafanactl_datasources.md)	 - Manage Grafana datasources
 * [grafanactl dev](grafanactl_dev.md)	 - Manage Grafana resources as code
 * [grafanactl providers](grafanactl_providers.md)	 - List registered providers
-* [grafanactl query](grafanactl_query.md)	 - Execute queries against Grafana datasources
 * [grafanactl resources](grafanactl_resources.md)	 - Manipulate Grafana resources
 * [grafanactl slo](grafanactl_slo.md)	 - Manage Grafana SLO resources.
 * [grafanactl synth](grafanactl_synth.md)	 - Manage Grafana Synthetic Monitoring resources.

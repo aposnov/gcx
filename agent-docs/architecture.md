@@ -363,9 +363,8 @@ grafanactl
   +-- resources          (--config, --context as persistent flags)
   |     +-- get, schemas, pull, push, delete, edit, validate
   +-- datasources        (--config, --context as persistent flags)
-  |     +-- get, list, prometheus, loki
-  +-- query              (--config, --context as persistent flags)
-  |     (single command: execute PromQL or LogQL via unified query API)
+  |     +-- get, list, prometheus, loki, pyroscope, tempo, generic
+  |     (each kind subgroup exposes its own `query` subcommand)
   +-- providers
   |     (single command: list registered providers)
   +-- dev
@@ -708,8 +707,8 @@ Files most important for understanding the codebase. Organized by architectural 
 | `internal/query/loki/client.go` | Loki query client (Query, Labels, LabelValues, Series) |
 | `internal/query/loki/types.go` | Request/response types for Loki |
 | `internal/query/loki/formatter.go` | Table/text formatting for Loki responses |
-| `cmd/grafanactl/datasources/command.go` | `datasources` command group (get, list, prometheus, loki subcommands) |
-| `cmd/grafanactl/query/command.go` | `query` command (unified PromQL/LogQL execution with graph output) |
+| `cmd/grafanactl/datasources/command.go` | `datasources` command group (list, get, prometheus, loki, pyroscope, tempo, generic subcommands) |
+| `cmd/grafanactl/datasources/query/` | Per-kind `query` subcommand constructors and shared infrastructure (codecs, time parsing) |
 
 ### Dashboard Image Renderer
 

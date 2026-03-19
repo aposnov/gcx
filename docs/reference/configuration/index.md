@@ -74,6 +74,11 @@ contexts:
     default-loki-datasource: string
     # DefaultPyroscopeDatasource is the UID of the default Pyroscope datasource to use for queries.
     default-pyroscope-datasource: string
+    # Datasources holds per-kind default datasource UIDs, indexed by datasource kind (e.g. "prometheus", "loki").
+    # Takes precedence over the legacy DefaultXxxDatasource fields when both are set.
+    datasources: 
+      ${string}:
+        string
     # Providers holds per-provider configuration, indexed by provider name.
     # Each provider has a map of string key-value pairs.
     # Secret fields are selectively redacted by providers.RedactSecrets using

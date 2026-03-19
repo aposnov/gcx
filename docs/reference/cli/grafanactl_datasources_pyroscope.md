@@ -28,4 +28,5 @@ Operations specific to Pyroscope datasources such as profile-types and labels.
 * [grafanactl datasources](grafanactl_datasources.md)	 - Manage Grafana datasources
 * [grafanactl datasources pyroscope labels](grafanactl_datasources_pyroscope_labels.md)	 - List labels or label values
 * [grafanactl datasources pyroscope profile-types](grafanactl_datasources_pyroscope_profile-types.md)	 - List available profile types
+* [grafanactl datasources pyroscope query](grafanactl_datasources_pyroscope_query.md)	 - Execute a profiling query against a Pyroscope datasource
 

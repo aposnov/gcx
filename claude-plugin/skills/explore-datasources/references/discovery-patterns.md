@@ -18,7 +18,7 @@ grep -i http metrics.json
 grafanactl datasources prometheus metadata -d <uid> --metric prometheus_http_requests_total
 
 # 5. Test query
-grafanactl query -d <uid> -e 'rate(prometheus_http_requests_total[5m])'
+grafanactl datasources prometheus query <uid> 'rate(prometheus_http_requests_total[5m])'
 ```
 
 ## Pattern 2: Understanding Service Labels
@@ -31,7 +31,7 @@ grafanactl datasources prometheus labels -d <uid>
 grafanactl datasources prometheus labels -d <uid> --label job
 
 # 3. Get all instances for a specific job
-grafanactl query -d <uid> -e 'up{job="my-service"}'
+grafanactl datasources prometheus query <uid> 'up{job="my-service"}'
 
 # 4. List available status codes
 grafanactl datasources prometheus labels -d <uid> --label code
@@ -47,7 +47,7 @@ grafanactl datasources prometheus targets -d <uid>
 grafanactl datasources prometheus labels -d <uid> --label job
 
 # 3. Check which services are up
-grafanactl query -d <uid> -e 'up'
+grafanactl datasources prometheus query <uid> 'up'
 
 # 4. Get detailed labels for a service
 grafanactl datasources prometheus labels -d <uid> --label app
@@ -120,7 +120,7 @@ JOBS=$(grafanactl datasources prometheus labels -d <uid> --label job -o json)
 # Query each job
 for job in $(echo $JOBS | jq -r '.data[]'); do
   echo "Job: $job"
-  grafanactl query -d <uid> -e "up{job=\"$job\"}"
+  grafanactl datasources prometheus query <uid> "up{job=\"$job\"}"
 done
 ```
 
@@ -139,7 +139,7 @@ grafanactl datasources prometheus targets -d <uid> --state dropped
 grafanactl datasources prometheus targets -d <uid> --state any
 
 # Query for down targets
-grafanactl query -d <uid> -e 'up == 0'
+grafanactl datasources prometheus query <uid> 'up == 0'
 ```
 
 ## Use Case Workflows
@@ -159,7 +159,7 @@ grafanactl query -d <uid> -e 'up == 0'
 2. For each Prometheus datasource:
    - Get label values for `job`, `instance`, or `app`
    - Search for system name in labels
-3. Test query to confirm: `up{job="system-x"}`
+3. Test query to confirm: `grafanactl datasources prometheus query <uid> 'up{job="system-x"}'`
 
 **For Loki:**
 1. List all Loki datasources
@@ -207,7 +207,7 @@ For Prometheus range queries, use the `-o graph` output codec to render results 
 
 ```bash
 # Query and render as terminal graph
-grafanactl query -d <uid> -e 'rate(http_requests_total[5m])' --start now-1h --end now --step 1m -o graph
+grafanactl datasources prometheus query <uid> 'rate(http_requests_total[5m])' --from now-1h --to now --step 1m -o graph
 ```
 
-Note: The graph output codec only works with range queries (requires `--start`, `--end`, and `--step`).
+Note: The graph output codec only works with range queries (requires `--from`, `--to`, and `--step`).
