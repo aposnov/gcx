@@ -206,7 +206,7 @@ cmd/grafanactl/
 ├── resources/
 │   ├── command.go           resources group (wires configOpts to all subcommands)
 │   ├── get.go               resources get
-│   ├── list.go              resources schemas  [Use: "schemas"; formerly "list"]
+│   ├── schemas.go           resources schemas
 │   ├── pull.go              resources pull
 │   ├── push.go              resources push
 │   ├── delete.go            resources delete

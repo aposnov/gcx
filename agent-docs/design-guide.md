@@ -88,7 +88,7 @@ output is always JSON regardless of the `--output` default.
 grafanactl resources get dashboards/my-dash --json metadata.name,spec.title
 
 # List operation: output is {"items": [...]}
-grafanactl resources list dashboards --json metadata.name
+grafanactl resources get dashboards --json metadata.name
 
 # Discover available field paths for a resource type
 grafanactl resources get dashboards/my-dash --json ?

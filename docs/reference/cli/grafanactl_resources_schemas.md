@@ -28,7 +28,7 @@ grafanactl resources schemas [flags]
   -h, --help            help for schemas
       --json string     Comma-separated list of fields to include in JSON output, or '?' to discover available fields
       --no-schema       Skip fetching OpenAPI spec schemas (faster, omits schema info and unlistable resource types)
-  -o, --output string   Output format. One of: json, table, text, wide, yaml (default "text")
+  -o, --output string   Output format. One of: json, text, wide, yaml (default "text")
 ```
 
 ### Options inherited from parent commands
