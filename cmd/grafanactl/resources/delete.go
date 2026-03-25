@@ -7,9 +7,9 @@ import (
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
 	"github.com/grafana/grafanactl/cmd/grafanactl/fail"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/resources"
 	"github.com/grafana/grafanactl/internal/resources/discovery"
 	"github.com/grafana/grafanactl/internal/resources/local"
@@ -105,7 +105,7 @@ func deleteCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				opts.Force = true
 			}
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

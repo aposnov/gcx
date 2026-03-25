@@ -7,9 +7,9 @@ import (
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
 	"github.com/grafana/grafanactl/cmd/grafanactl/datasources/query"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	internalconfig "github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/query/pyroscope"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -66,7 +66,7 @@ func profileTypesCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 			ctx := cmd.Context()
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}
@@ -169,7 +169,7 @@ func pyroscopeLabelsCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 			ctx := cmd.Context()
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

@@ -12,8 +12,8 @@ import (
 	"github.com/grafana/grafana-foundation-sdk/go/dashboard"
 	"github.com/grafana/grafana-foundation-sdk/go/dashboardv2beta1"
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/cmd/grafanactl/resources"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	model "github.com/grafana/grafanactl/internal/resources"
 	"github.com/huandu/xstrings"
 	"github.com/spf13/cobra"
@@ -61,7 +61,7 @@ func importCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

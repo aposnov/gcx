@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/config"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
@@ -102,7 +102,7 @@ func Command() *cobra.Command {
 				path = "/" + path
 			}
 
-			cfg, err := configOpts.LoadRESTConfig(cmd.Context())
+			cfg, err := configOpts.LoadGrafanaConfig(cmd.Context())
 			if err != nil {
 				return err
 			}

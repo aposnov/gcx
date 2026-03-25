@@ -1,0 +1,144 @@
+package oncall
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/grafana/grafanactl/internal/config"
+	"github.com/grafana/grafanactl/internal/providers"
+	"github.com/grafana/grafanactl/internal/resources/adapter"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
+
+var _ providers.Provider = &OnCallProvider{}
+
+func init() { //nolint:gochecknoinits // Self-registration pattern (like database/sql drivers).
+	providers.Register(&OnCallProvider{})
+	RegisterAdapters(&configLoader{})
+}
+
+// OnCallProvider manages Grafana OnCall resources.
+type OnCallProvider struct{}
+
+// Name returns the unique identifier for this provider.
+func (p *OnCallProvider) Name() string { return "oncall" }
+
+// ShortDesc returns a one-line description of the provider.
+func (p *OnCallProvider) ShortDesc() string {
+	return "Manage Grafana OnCall resources."
+}
+
+// Commands returns the Cobra commands contributed by this provider.
+// Structure follows the canonical pattern: oncall <resource> <command>
+// (e.g., oncall integrations list, oncall alert-groups get <id>).
+func (p *OnCallProvider) Commands() []*cobra.Command {
+	loader := &configLoader{}
+
+	oncallCmd := &cobra.Command{
+		Use:     "oncall",
+		Short:   p.ShortDesc(),
+		Aliases: []string{"oc"},
+	}
+
+	loader.bindFlags(oncallCmd.PersistentFlags())
+
+	oncallCmd.AddCommand(
+		// Resource groups: oncall <resource> list|get|...
+		newIntegrationsCmd(loader),
+		newEscalationChainsCmd(loader),
+		newEscalationPoliciesCmd(loader),
+		newSchedulesCmd(loader),
+		newShiftsCmd(loader),
+		newRoutesCmd(loader),
+		newWebhooksCmd(loader),
+		newAlertGroupsCommand(loader),
+		newUsersCommand(loader),
+		newTeamsCmd(loader),
+		newUserGroupsCmd(loader),
+		newSlackChannelsCmd(loader),
+		newAlertsCmd(loader),
+		newOrganizationsCmd(loader),
+		newResolutionNotesCmd(loader),
+		newShiftSwapsCmd(loader),
+		newPersonalNotificationRulesCmd(loader),
+		// Standalone action commands
+		newEscalateCommand(loader),
+	)
+
+	return []*cobra.Command{oncallCmd}
+}
+
+// Validate checks that the given provider configuration is valid.
+func (p *OnCallProvider) Validate(cfg map[string]string) error {
+	return nil
+}
+
+// ConfigKeys returns the configuration keys used by this provider.
+// The oncall provider discovers its URL from the IRM plugin settings
+// and uses the standard Grafana SA token for authentication.
+func (p *OnCallProvider) ConfigKeys() []providers.ConfigKey {
+	return nil
+}
+
+// ResourceAdapters returns adapter factories for OnCall resource types.
+// Factories are registered globally via adapter.Register() in resource_adapter.go init().
+func (p *OnCallProvider) ResourceAdapters() []adapter.Factory {
+	return nil
+}
+
+// OnCallConfigLoader can produce a configured OnCall client.
+type OnCallConfigLoader interface {
+	LoadOnCallClient(ctx context.Context) (*Client, string, error)
+}
+
+// configLoader loads OnCall config and creates the client.
+// It composes providers.ConfigLoader for shared config loading logic
+// and adds OnCall-specific URL discovery.
+type configLoader struct {
+	providers.ConfigLoader
+}
+
+func (l *configLoader) bindFlags(flags *pflag.FlagSet) {
+	l.BindFlags(flags)
+}
+
+// LoadOnCallClient loads config, discovers the OnCall API URL, and returns a configured client.
+func (l *configLoader) LoadOnCallClient(ctx context.Context) (*Client, string, error) {
+	restCfg, err := l.LoadGrafanaConfig(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	oncallURL, err := discoverOnCallURL(ctx, restCfg)
+	if err != nil {
+		return nil, "", err
+	}
+
+	client, err := NewClient(oncallURL, restCfg)
+	if err != nil {
+		return nil, "", err
+	}
+	return client, restCfg.Namespace, nil
+}
+
+// discoverOnCallURL resolves the OnCall API URL from env or plugin settings.
+func discoverOnCallURL(ctx context.Context, restCfg config.NamespacedRESTConfig) (string, error) {
+	// Check for explicit OnCall URL from env.
+	// GRAFANA_ONCALL_URL is the primary env var.
+	// GRAFANA_PROVIDER_ONCALL_ONCALL_URL is also supported (provider env convention).
+	if u := os.Getenv("GRAFANA_ONCALL_URL"); u != "" {
+		return u, nil
+	}
+	if u := os.Getenv("GRAFANA_PROVIDER_ONCALL_ONCALL_URL"); u != "" {
+		return u, nil
+	}
+
+	// Discover from plugin settings.
+	discovered, err := DiscoverOnCallURL(ctx, restCfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to discover OnCall API URL: %w", err)
+	}
+	return discovered, nil
+}

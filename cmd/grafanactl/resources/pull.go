@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/resources/local"
 	"github.com/grafana/grafanactl/internal/resources/process"
 	"github.com/grafana/grafanactl/internal/resources/remote"
@@ -114,7 +114,7 @@ func pullCmd(configOpts *cmdconfig.Options) *cobra.Command {
 				return err
 			}
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}
@@ -135,7 +135,7 @@ func pullCmd(configOpts *cmdconfig.Options) *cobra.Command {
 
 			writer := local.FSWriter{
 				Path:        opts.Path,
-				Namer:       local.GroupResourcesByKind(opts.IO.OutputFormat),
+				Namer:       local.GroupResourcesByKind(opts.IO.OutputFormat, local.PluralsFromFilters(res.Filters)),
 				Encoder:     codec,
 				StopOnError: opts.OnError.StopOnError(),
 			}

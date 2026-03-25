@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-app-sdk/logging"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/grafana"
 	"github.com/grafana/grafanactl/internal/graph"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/providers/synth/probes"
 	"github.com/grafana/grafanactl/internal/providers/synth/smcfg"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
@@ -171,7 +171,7 @@ for each check. Requires a Prometheus datasource containing SM metrics.`,
 
 			initG.Go(func() error {
 				var err error
-				restCfg, err = loader.LoadRESTConfig(initCtx)
+				restCfg, err = loader.LoadGrafanaConfig(initCtx)
 				return err
 			})
 
@@ -330,7 +330,7 @@ Requires a Prometheus datasource containing SM metrics.`,
 			}
 
 			// Load REST config and create Prometheus client.
-			restCfg, err := loader.LoadRESTConfig(ctx)
+			restCfg, err := loader.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

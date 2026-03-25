@@ -4,10 +4,10 @@ List available Grafana API resource types
 
 ### Synopsis
 
-List available Grafana API resource types and their schemas.
+List available Grafana API resource types and their schemas. Optionally filter by a resource selector.
 
 ```
-grafanactl resources schemas [flags]
+grafanactl resources schemas [RESOURCE_SELECTOR] [flags]
 ```
 
 ### Examples
@@ -19,6 +19,8 @@ grafanactl resources schemas [flags]
 	grafanactl resources schemas -o json
 	grafanactl resources schemas -o yaml
 	grafanactl resources schemas -o json --no-schema
+	grafanactl resources schemas incidents
+	grafanactl resources schemas incidents.v1alpha1.incident.ext.grafana.app -o json
 
 ```
 

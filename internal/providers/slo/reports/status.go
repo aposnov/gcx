@@ -6,9 +6,9 @@ import (
 	"io"
 	"text/tabwriter"
 
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/graph"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/providers/slo/definitions"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
 	"github.com/spf13/cobra"
@@ -44,7 +44,7 @@ func (o *reportStatusOpts) setup(flags *pflag.FlagSet) {
 	o.IO.BindFlags(flags)
 }
 
-func newStatusCommand(loader RESTConfigLoader) *cobra.Command {
+func newStatusCommand(loader GrafanaConfigLoader) *cobra.Command {
 	opts := &reportStatusOpts{}
 	cmd := &cobra.Command{
 		Use:   "status [UUID]",
@@ -75,7 +75,7 @@ metrics, and computes combined SLI and error budget per report.`,
 
 			ctx := cmd.Context()
 
-			restCfg, err := loader.LoadRESTConfig(ctx)
+			restCfg, err := loader.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

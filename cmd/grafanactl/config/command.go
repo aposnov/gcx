@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,10 +11,10 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/grafana/grafanactl/cmd/grafanactl/fail"
-	"github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/config"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/grafana"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/providers"
 	"github.com/grafana/grafanactl/internal/resources/discovery"
 	"github.com/grafana/grafanactl/internal/secrets"
@@ -110,7 +111,7 @@ func (opts *Options) loadConfigTolerant(ctx context.Context, extraOverrides ...c
 		})
 	}
 
-	return config.Load(ctx, opts.configSource(), overrides...)
+	return config.LoadLayered(ctx, opts.ConfigFile, overrides...)
 }
 
 // LoadConfig loads the configuration file (default, or explicitly set via flags) and validates it.
@@ -127,14 +128,22 @@ func (opts *Options) LoadConfig(ctx context.Context) (config.Config, error) {
 	return opts.loadConfigTolerant(ctx, validator)
 }
 
-// LoadRESTConfig loads the configuration file and constructs a REST config from it.
-func (opts *Options) LoadRESTConfig(ctx context.Context) (config.NamespacedRESTConfig, error) {
+// LoadGrafanaConfig loads the configuration file and constructs a REST config from it.
+func (opts *Options) LoadGrafanaConfig(ctx context.Context) (config.NamespacedRESTConfig, error) {
 	cfg, err := opts.LoadConfig(ctx)
 	if err != nil {
 		return config.NamespacedRESTConfig{}, err
 	}
 
 	return cfg.GetCurrentContext().ToRESTConfig(ctx), nil
+}
+
+// loadConfigTolerantLayered loads the configuration using the layered discovery
+// mechanism (system → user → local), without validation.
+// This function should only be used by config-related commands, to allow the
+// user to iterate on the configuration until it becomes valid.
+func (opts *Options) loadConfigTolerantLayered(ctx context.Context) (config.Config, error) {
+	return config.LoadLayered(ctx, opts.ConfigFile)
 }
 
 func (opts *Options) configSource() config.Source {
@@ -170,6 +179,8 @@ The configuration file to load is chosen as follows:
 
 	cmd.AddCommand(checkCmd(configOpts))
 	cmd.AddCommand(currentContextCmd(configOpts))
+	cmd.AddCommand(editCmd(configOpts))
+	cmd.AddCommand(pathCmd(configOpts))
 	cmd.AddCommand(setCmd(configOpts))
 	cmd.AddCommand(unsetCmd(configOpts))
 	cmd.AddCommand(useContextCmd(configOpts))
@@ -180,7 +191,7 @@ The configuration file to load is chosen as follows:
 }
 
 type viewOpts struct {
-	IO io.Options
+	IO cmdio.Options
 
 	Minify bool
 	Raw    bool
@@ -250,14 +261,14 @@ func viewCmd(configOpts *Options) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				for _, field := range io.DiscoverFields(cfgMap) {
+				for _, field := range cmdio.DiscoverFields(cfgMap) {
 					fmt.Fprintln(cmd.OutOrStdout(), field)
 				}
 				return nil
 			}
 
 			if len(opts.IO.JSONFields) > 0 {
-				codec := io.NewFieldSelectCodec(opts.IO.JSONFields)
+				codec := cmdio.NewFieldSelectCodec(opts.IO.JSONFields)
 				return codec.Encode(cmd.OutOrStdout(), cfg)
 			}
 			return opts.IO.Encode(cmd.OutOrStdout(), cfg)
@@ -343,15 +354,15 @@ func checkCmd(configOpts *Options) *cobra.Command {
 
 			stdout := cmd.OutOrStdout()
 
-			io.Success(stdout, "Configuration file: %s", io.Green(cfg.Source))
+			cmdio.Success(stdout, "Configuration file: %s", cmdio.Green(cfg.Source))
 
 			switch {
 			case cfg.CurrentContext == "":
-				io.Error(stdout, "Current context: %s", io.Red("<undefined>"))
+				cmdio.Error(stdout, "Current context: %s", cmdio.Red("<undefined>"))
 			case !cfg.HasContext(cfg.CurrentContext):
-				io.Error(stdout, "Current context: %s", io.Red(config.ContextNotFound(cfg.CurrentContext).Error()))
+				cmdio.Error(stdout, "Current context: %s", cmdio.Red(config.ContextNotFound(cfg.CurrentContext).Error()))
 			default:
-				io.Success(stdout, "Current context: %s", io.Green(cfg.CurrentContext))
+				cmdio.Success(stdout, "Current context: %s", cmdio.Green(cfg.CurrentContext))
 			}
 
 			cmd.Println()
@@ -374,7 +385,7 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) error {
 	stdout := cmd.OutOrStdout()
 	title := "Context: "
 	titleLen := len(title) + len(gCtx.Name)
-	title += io.Bold(gCtx.Name)
+	title += cmdio.Bold(gCtx.Name)
 
 	summarizeError := func(err error) string {
 		detailedErr := fail.ErrorToDetailedError(err)
@@ -385,7 +396,7 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) error {
 	printSuggestions := func(err error) {
 		detailedErr := fail.ErrorToDetailedError(err)
 		if len(detailedErr.Suggestions) != 0 {
-			io.Info(stdout, "Suggestions:\n")
+			cmdio.Info(stdout, "Suggestions:\n")
 			for _, suggestion := range detailedErr.Suggestions {
 				fmt.Fprintf(stdout, "  • %s\n", suggestion)
 			}
@@ -393,32 +404,32 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) error {
 		}
 	}
 
-	cmd.Println(io.Yellow(title))
-	cmd.Println(io.Yellow(strings.Repeat("=", titleLen)))
+	cmd.Println(cmdio.Yellow(title))
+	cmd.Println(cmdio.Yellow(strings.Repeat("=", titleLen)))
 
 	if err := gCtx.Validate(); err != nil {
-		io.Error(stdout, "Configuration: %s", io.Red(summarizeError(err)))
-		io.Warning(stdout, "Connectivity: %s", io.Yellow("skipped"))
-		io.Warning(stdout, "Grafana version: %s", io.Yellow("skipped")+"\n")
+		cmdio.Error(stdout, "Configuration: %s", cmdio.Red(summarizeError(err)))
+		cmdio.Warning(stdout, "Connectivity: %s", cmdio.Yellow("skipped"))
+		cmdio.Warning(stdout, "Grafana version: %s", cmdio.Yellow("skipped")+"\n")
 
 		printSuggestions(err)
 		return nil
 	}
 
-	io.Success(stdout, "Configuration: %s", io.Green("valid"))
+	cmdio.Success(stdout, "Configuration: %s", cmdio.Green("valid"))
 
 	if _, err := discovery.NewDefaultRegistry(cmd.Context(), config.NewNamespacedRESTConfig(cmd.Context(), *gCtx)); err != nil {
-		io.Error(stdout, "Connectivity: %s", io.Red(summarizeError(err)))
-		io.Warning(stdout, "Grafana version: %s", io.Yellow("skipped")+"\n")
+		cmdio.Error(stdout, "Connectivity: %s", cmdio.Red(summarizeError(err)))
+		cmdio.Warning(stdout, "Grafana version: %s", cmdio.Yellow("skipped")+"\n")
 		printSuggestions(err)
 		return nil
 	}
 
-	io.Success(stdout, "Connectivity: %s", io.Green("online"))
+	cmdio.Success(stdout, "Connectivity: %s", cmdio.Green("online"))
 
 	version, err := grafana.GetVersion(gCtx)
 	if err != nil {
-		io.Error(stdout, "Grafana version: %s", io.Red(summarizeError(err))+"\n")
+		cmdio.Error(stdout, "Grafana version: %s", cmdio.Red(summarizeError(err))+"\n")
 		return nil
 	}
 
@@ -426,7 +437,7 @@ func checkContext(cmd *cobra.Command, gCtx *config.Context) error {
 		return &grafana.VersionIncompatibleError{Version: version}
 	}
 
-	io.Success(stdout, "Grafana version: %s", io.Green(version.String())+"\n")
+	cmdio.Success(stdout, "Grafana version: %s", cmdio.Green(version.String())+"\n")
 
 	return nil
 }
@@ -455,7 +466,7 @@ func useContextCmd(configOpts *Options) *cobra.Command {
 				return err
 			}
 
-			io.Success(cmd.OutOrStdout(), "Context set to \"%s\"", cfg.CurrentContext)
+			cmdio.Success(cmd.OutOrStdout(), "Context set to \"%s\"", cfg.CurrentContext)
 			return nil
 		},
 	}
@@ -463,7 +474,44 @@ func useContextCmd(configOpts *Options) *cobra.Command {
 	return cmd
 }
 
+// resolveWriteTarget determines which config file to write to based on --config flag,
+// --file flag, and the number of discovered sources.
+func resolveWriteTarget(configOpts *Options, fileType string, ctx context.Context) (config.Source, error) {
+	// --config flag always wins.
+	if configOpts.ConfigFile != "" {
+		return config.ExplicitConfigFile(configOpts.ConfigFile), nil
+	}
+
+	// --file flag targets a specific layer.
+	if fileType != "" {
+		layered, err := config.LoadLayered(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range layered.Sources {
+			if s.Type == fileType {
+				return config.ExplicitConfigFile(s.Path), nil
+			}
+		}
+		return nil, fmt.Errorf("no %s config file found", fileType)
+	}
+
+	// No flags — check if ambiguous.
+	layered, err := config.LoadLayered(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	if len(layered.Sources) > 1 {
+		return nil, errors.New("multiple config files loaded; specify which to edit with --file (system, user, local)")
+	}
+
+	// Single source or no sources — use existing behavior.
+	return configOpts.configSource(), nil
+}
+
 func setCmd(configOpts *Options) *cobra.Command {
+	var fileType string
+
 	cmd := &cobra.Command{
 		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
 		Args:  cobra.ExactArgs(2),
@@ -478,9 +526,17 @@ PROPERTY_VALUE is the new value to set.`,
 	grafanactl config set contexts.dev-instance.grafana.server https://grafana-dev.example
 
 	# Disable the validation of the server's SSL certificate in the "dev-instance" context
-	grafanactl config set contexts.dev-instance.grafana.insecure-skip-tls-verify true`,
+	grafanactl config set contexts.dev-instance.grafana.insecure-skip-tls-verify true
+
+	# Set a value in the local config layer
+	grafanactl config set --file local contexts.prod.cloud.token my-token`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			targetSource, err := resolveWriteTarget(configOpts, fileType, cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(cmd.Context(), targetSource)
 			if err != nil {
 				return err
 			}
@@ -489,14 +545,18 @@ PROPERTY_VALUE is the new value to set.`,
 				return err
 			}
 
-			return config.Write(cmd.Context(), configOpts.configSource(), cfg)
+			return config.Write(cmd.Context(), targetSource, cfg)
 		},
 	}
+
+	cmd.Flags().StringVar(&fileType, "file", "", "Config layer to write to (system, user, local)")
 
 	return cmd
 }
 
 func unsetCmd(configOpts *Options) *cobra.Command {
+	var fileType string
+
 	cmd := &cobra.Command{
 		Use:   "unset PROPERTY_NAME",
 		Args:  cobra.ExactArgs(1),
@@ -509,9 +569,17 @@ PROPERTY_NAME is a dot-delimited reference to the value to unset. It can either 
 	grafanactl config unset contexts.foo
 
 	# Unset the "insecure-skip-tls-verify" flag in the "dev-instance" context
-	grafanactl config unset contexts.dev-instance.grafana.insecure-skip-tls-verify`,
+	grafanactl config unset contexts.dev-instance.grafana.insecure-skip-tls-verify
+
+	# Unset a value in the local config layer
+	grafanactl config unset --file local contexts.prod.cloud.token`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			targetSource, err := resolveWriteTarget(configOpts, fileType, cmd.Context())
+			if err != nil {
+				return err
+			}
+
+			cfg, err := config.Load(cmd.Context(), targetSource)
 			if err != nil {
 				return err
 			}
@@ -520,9 +588,11 @@ PROPERTY_NAME is a dot-delimited reference to the value to unset. It can either 
 				return err
 			}
 
-			return config.Write(cmd.Context(), configOpts.configSource(), cfg)
+			return config.Write(cmd.Context(), targetSource, cfg)
 		},
 	}
+
+	cmd.Flags().StringVar(&fileType, "file", "", "Config layer to write to (system, user, local)")
 
 	return cmd
 }

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	cmdconfig "github.com/grafana/grafanactl/cmd/grafanactl/config"
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/format"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/resources"
 	"github.com/grafana/grafanactl/internal/resources/local"
 	"github.com/grafana/grafanactl/internal/resources/remote"
@@ -61,7 +61,7 @@ The edition will be cancelled if no changes are written to the file or if the fi
 			ctx := cmd.Context()
 			edit := editorFromEnv()
 
-			cfg, err := configOpts.LoadRESTConfig(ctx)
+			cfg, err := configOpts.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}

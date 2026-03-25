@@ -11,9 +11,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	cmdio "github.com/grafana/grafanactl/cmd/grafanactl/io"
 	"github.com/grafana/grafanactl/internal/format"
 	"github.com/grafana/grafanactl/internal/graph"
+	cmdio "github.com/grafana/grafanactl/internal/output"
 	"github.com/grafana/grafanactl/internal/query/prometheus"
 	"github.com/grafana/promql-builder/go/promql"
 	"github.com/spf13/cobra"
@@ -70,7 +70,7 @@ func ValidateTimelineFlags(cmd *cobra.Command) error {
 	return nil
 }
 
-func newTimelineCommand(loader RESTConfigLoader) *cobra.Command {
+func newTimelineCommand(loader GrafanaConfigLoader) *cobra.Command {
 	opts := &timelineOpts{}
 	cmd := &cobra.Command{
 		Use:   "timeline [UUID]",
@@ -113,7 +113,7 @@ grafana_slo_sli_window metrics.`,
 
 			ctx := cmd.Context()
 
-			restCfg, err := loader.LoadRESTConfig(ctx)
+			restCfg, err := loader.LoadGrafanaConfig(ctx)
 			if err != nil {
 				return err
 			}
