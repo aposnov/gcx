@@ -83,10 +83,10 @@ Grafana K8s API            Product REST APIs
 
 > **Without devbox**: All `make` targets require `devbox`. If you don't have it, use the direct Go commands instead:
 > ```bash
-> go build -buildvcs=false -o bin/grafanactl ./cmd/grafanactl/   # replaces make build
-> go test ./...                                                    # replaces make tests
+> go build -buildvcs=false -o bin/gcx ./cmd/gcx/   # replaces make build
+> go test ./...                                      # replaces make tests
 > ```
-> Always build to `bin/grafanactl` (not a temp binary) so the binary stays at a stable path for testing.
+> Always build to `bin/gcx` (not a temp binary) so the binary stays at a stable path for testing.
 
 ```bash
 make build       # Build to bin/gcx
@@ -120,6 +120,7 @@ make docs        # Generate + build all documentation
 ```
 cmd/gcx/
 ├── root/        CLI root (logging, global flags)
+├── auth/        OAuth login command (browser-based PKCE flow)
 ├── config/      Config management commands (set, use-context, view...)
 ├── resources/   Resource commands (get, schemas, push, pull, delete, edit, validate)
 ├── dashboards/  Dashboard commands (snapshot via Image Renderer)
@@ -136,6 +137,7 @@ cmd/gcx/
 └── fail/        Structured error → user-friendly message conversion
 
 internal/
+├── auth/        OAuth PKCE flow, token refresh transport
 ├── config/      Config types, loader, editor, rest.Config builder, stack-id discovery, context name helpers
 ├── cloud/       GCOM HTTP client for Grafana Cloud stack discovery
 ├── fleet/       Shared fleet base client (HTTP, auth, config — used by fleet provider and setup/instrumentation)
@@ -160,6 +162,7 @@ internal/
 │   ├── slo/        SLO provider (definitions, reports)
 │   └── synth/      Synthetic Monitoring provider (checks, probes)
 ├── dashboards/  Dashboard Image Renderer client (PNG snapshots)
+├── datasources/ Datasource HTTP client (legacy REST API)
 ├── query/       Datasource query clients
 │   ├── prometheus/  Prometheus HTTP query client
 │   └── loki/        Loki HTTP query client

@@ -35,11 +35,11 @@ func (opts *Options) BindFlags(flags *pflag.FlagSet) {
 	_ = cobra.MarkFlagFilename(flags, "config", "yaml", "yml")
 }
 
-// loadConfigTolerant loads the configuration file (default, or explicitly set via flags)
+// LoadConfigTolerant loads the configuration file (default, or explicitly set via flags)
 // and returns it without validation.
 // This function should only be used by config-related commands, to allow the
 // user to iterate on the configuration until it becomes valid.
-func (opts *Options) loadConfigTolerant(ctx context.Context, extraOverrides ...config.Override) (config.Config, error) {
+func (opts *Options) LoadConfigTolerant(ctx context.Context, extraOverrides ...config.Override) (config.Config, error) {
 	overrides := append([]config.Override{
 		// If Grafana-related env variables are set, use them to configure the
 		// current context and Grafana config.
@@ -126,17 +126,40 @@ func (opts *Options) LoadConfig(ctx context.Context) (config.Config, error) {
 		return cfg.GetCurrentContext().Validate()
 	}
 
-	return opts.loadConfigTolerant(ctx, validator)
+	return opts.LoadConfigTolerant(ctx, validator)
 }
 
 // LoadGrafanaConfig loads the configuration file and constructs a REST config from it.
+// When OAuth proxy mode is active, it wires the OnRefresh callback to persist
+// refreshed tokens back to the config file.
 func (opts *Options) LoadGrafanaConfig(ctx context.Context) (config.NamespacedRESTConfig, error) {
 	cfg, err := opts.LoadConfig(ctx)
 	if err != nil {
 		return config.NamespacedRESTConfig{}, err
 	}
 
-	return cfg.GetCurrentContext().ToRESTConfig(ctx), nil
+	restCfg := cfg.GetCurrentContext().ToRESTConfig(ctx)
+
+	// Wire token persistence: on refresh, reload config, update tokens, write back.
+	source := opts.ConfigSource()
+	contextName := cfg.CurrentContext
+	restCfg.SetOnRefresh(func(token, refreshToken, expiresAt, refreshExpiresAt string) error {
+		fresh, err := opts.LoadConfigTolerant(ctx)
+		if err != nil {
+			return err
+		}
+		c := fresh.Contexts[contextName]
+		if c == nil || c.Grafana == nil {
+			return nil
+		}
+		c.Grafana.OAuthToken = token
+		c.Grafana.OAuthRefreshToken = refreshToken
+		c.Grafana.OAuthTokenExpiresAt = expiresAt
+		c.Grafana.OAuthRefreshExpiresAt = refreshExpiresAt
+		return config.Write(ctx, source, fresh)
+	})
+
+	return restCfg, nil
 }
 
 // loadConfigTolerantLayered loads the configuration using the layered discovery
@@ -147,7 +170,7 @@ func (opts *Options) loadConfigTolerantLayered(ctx context.Context) (config.Conf
 	return config.LoadLayered(ctx, opts.ConfigFile)
 }
 
-func (opts *Options) configSource() config.Source {
+func (opts *Options) ConfigSource() config.Source {
 	if opts.ConfigFile != "" {
 		return config.ExplicitConfigFile(opts.ConfigFile)
 	}
@@ -235,7 +258,7 @@ func viewCmd(configOpts *Options) *cobra.Command {
 				return err
 			}
 
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			cfg, err := configOpts.LoadConfigTolerant(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -292,7 +315,7 @@ func currentContextCmd(configOpts *Options) *cobra.Command {
 		Long:    "Display the current context name.",
 		Example: "\n\tgcx config current-context",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			cfg, err := configOpts.LoadConfigTolerant(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -314,7 +337,7 @@ func listContextsCmd(configOpts *Options) *cobra.Command {
 		Long:    "List the contexts defined in the configuration.",
 		Example: "\n\tgcx config list-contexts",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			cfg, err := configOpts.LoadConfigTolerant(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -351,7 +374,7 @@ func checkCmd(configOpts *Options) *cobra.Command {
 		Long:    "Check the current configuration for issues.",
 		Example: "\n\tgcx config check",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			cfg, err := configOpts.LoadConfigTolerant(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -455,7 +478,7 @@ func useContextCmd(configOpts *Options) *cobra.Command {
 		Long:    "Set the current context and updates the configuration file.",
 		Example: "\n\tgcx config use-context dev-instance",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := configOpts.loadConfigTolerant(cmd.Context())
+			cfg, err := configOpts.LoadConfigTolerant(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -466,7 +489,7 @@ func useContextCmd(configOpts *Options) *cobra.Command {
 
 			cfg.CurrentContext = args[0]
 
-			if err := config.Write(cmd.Context(), configOpts.configSource(), cfg); err != nil {
+			if err := config.Write(cmd.Context(), configOpts.ConfigSource(), cfg); err != nil {
 				return err
 			}
 
@@ -510,7 +533,7 @@ func resolveWriteTarget(configOpts *Options, fileType string, ctx context.Contex
 	}
 
 	// Single source or no sources — use existing behavior.
-	return configOpts.configSource(), nil
+	return configOpts.ConfigSource(), nil
 }
 
 func setCmd(configOpts *Options) *cobra.Command {

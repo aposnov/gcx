@@ -12,7 +12,7 @@ import (
 
 	cmdconfig "github.com/grafana/gcx/cmd/gcx/config"
 	internalconfig "github.com/grafana/gcx/internal/config"
-	"github.com/grafana/gcx/internal/grafana"
+	"github.com/grafana/gcx/internal/datasources"
 	cmdio "github.com/grafana/gcx/internal/output"
 	"github.com/spf13/pflag"
 )
@@ -106,22 +106,22 @@ func resolveTypedArgs(args []string, configOpts *cmdconfig.Options, ctx context.
 
 // getDatasourceType fetches the datasource type string from the Grafana API.
 func getDatasourceType(ctx context.Context, configOpts *cmdconfig.Options, datasourceUID string) (string, error) {
-	fullCfg, err := configOpts.LoadConfig(ctx)
+	restCfg, err := configOpts.LoadGrafanaConfig(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	gClient, err := grafana.ClientFromContext(fullCfg.GetCurrentContext())
+	dsClient, err := datasources.NewClient(restCfg)
 	if err != nil {
-		return "", fmt.Errorf("failed to create Grafana client: %w", err)
+		return "", fmt.Errorf("failed to create datasource client: %w", err)
 	}
 
-	dsResp, err := gClient.Datasources.GetDataSourceByUID(datasourceUID)
+	ds, err := dsClient.GetByUID(ctx, datasourceUID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get datasource %q: %w", datasourceUID, err)
 	}
 
-	return dsResp.Payload.Type, nil
+	return ds.Type, nil
 }
 
 // normalizeKind converts a Grafana datasource plugin ID to its short kind name.
