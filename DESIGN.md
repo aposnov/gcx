@@ -32,6 +32,11 @@ Provider System (internal/providers/)     -- Pluggable Cloud product providers
     v
 Grafana REST API (/api endpoint)          -- Product-specific REST endpoints
 
+Setup System (cmd/gcx/setup/)            -- Onboarding and declarative product config
+    |                                        (not a provider — standalone command area)
+    v
+Fleet/Instrumentation APIs               -- via internal/fleet/ and internal/setup/instrumentation/
+
 Query Layer (internal/query/)             -- Prometheus, Loki, Pyroscope, Tempo
     |                                        (direct HTTP, no k8s machinery)
     v
@@ -55,6 +60,7 @@ Datasource HTTP APIs                      -- PromQL, LogQL, profile, trace queri
 | [011](docs/adrs/adaptive-provider/001-cli-ux-and-resource-adapter-design.md) | Adaptive telemetry provider: CLI UX, adapter scope, verb naming | proposed |
 | [012](docs/adrs/migrate-provider-rewrite/002-five-phase-pipeline-redesign.md) | Five-phase pipeline redesign for /migrate-provider | accepted |
 | [013](docs/adrs/appo11y-provider/001-cli-ux-and-resource-adapter-design.md) | App O11y provider: singleton TypedCRUD, ETag-as-annotation, verb naming | accepted |
+| [014](docs/adrs/instrumentation/001-instrumentation-provider-design.md) | Declarative Instrumentation Setup under `gcx setup` | proposed |
 
 See [docs/adrs/](docs/adrs/) for all ADRs.
 
@@ -71,6 +77,8 @@ See [docs/adrs/](docs/adrs/) for all ADRs.
 | `cmd/gcx/api/` | Raw API passthrough command |
 | `cmd/gcx/linter/` | Linting commands (run, new, rules, test) |
 | `cmd/gcx/dev/` | Developer commands (import, scaffold, generate, lint, serve) |
+| `cmd/gcx/setup/` | Setup command area (onboarding, instrumentation) |
+| `cmd/gcx/setup/instrumentation/` | Instrumentation subcommands (status, discover, show, apply) |
 | `cmd/gcx/fail/` | Structured error to user-friendly message conversion |
 | `internal/config/` | Config types, loader, editor, rest.Config builder |
 | `internal/resources/` | Core types: Resource, Selector, Filter, Descriptor |
@@ -102,6 +110,8 @@ See [docs/adrs/](docs/adrs/) for all ADRs.
 | `internal/grafana/` | OpenAPI client (health checks, version detection) |
 | `internal/output/` | Output codec registry (json, yaml, text, wide — field selection, formatting) |
 | `internal/format/` | JSON/YAML codecs |
+| `internal/fleet/` | Shared fleet base client (HTTP, auth, config — shared between fleet provider and setup/instrumentation) |
+| `internal/setup/instrumentation/` | Manifest types (InstrumentationConfig), instrumentation client, optimistic lock comparison |
 | `internal/cloud/` | GCOM HTTP client for Grafana Cloud stack discovery |
 | `internal/httputils/` | HTTP helpers (used by serve command's proxy) |
 | `internal/secrets/` | Redactor for config view |

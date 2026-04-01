@@ -1,7 +1,5 @@
 # Codebase Architecture Analysis: gcx
 
-*Generated: 2026-03-02 | Domains Analyzed: 6 | Overall Confidence: 92% (High)*
-
 ---
 
 ## Executive Summary
@@ -12,22 +10,6 @@
 - **A composable processor pipeline** transforms resources during push and pull, keeping I/O and transformation concerns decoupled.
 - **Pluggable provider system** enables extending the CLI with new Grafana Cloud products via a self-registering `Provider` interface, each contributing CLI commands, resource adapters, and product-specific configuration.
 - **Test coverage is moderate** (~40-50%) with no automated integration tests, despite a docker-compose environment being available. This is the most significant quality gap.
-
----
-
-## Confidence Assessment
-
-| Section | Score | Level | Rationale |
-|---------|-------|-------|-----------|
-| Project Structure | 96% | High | Exhaustive analysis of directory layout, build system, CI/CD, and toolchain |
-| Resource Model | 95% | High | Core abstractions thoroughly documented with type relationships |
-| CLI Layer | 94% | High | Complete command tree, options pattern, and error handling chain |
-| Client/API Layer | 93% | High | Both client paths documented; minor gaps in retry/timeout behavior |
-| Config System | 95% | High | Full loading chain, env overrides, namespace resolution covered |
-| Data Flows | 94% | High | All four pipelines documented with concurrency models |
-| Testing | 70% | Medium | No dedicated analyzer; coverage known to be moderate |
-| Infrastructure | 88% | Medium | CI/CD and build well-covered; deployment beyond GitHub Releases less clear |
-| **Overall** | **92%** | **High** | |
 
 ---
 
@@ -66,6 +48,16 @@
          |            | - Secret       |  | - Direct HTTP  |  +----------------+
          |            |   redaction    |  |   (no k8s      |
          |            +----------------+  |    machinery)  |  +------------------+
+         |                               +----------------+  | Setup Layer      |
+         |                                                    | (cmd/gcx/setup/, |
+         |            +----------------+                      |  internal/setup/)|
+         |            | Shared Fleet   |                      | - Instrumentation|
+         |            | (internal/     |<---------------------+   config & apply |
+         |            |  fleet/)       |                      | - Declarative    |
+         |            | - Base HTTP    |                      |   manifests      |
+         |            |   client       |                      +------------------+
+         |            | - Auth/config  |
+         |            +----------------+
          |                               +----------------+  | Linter Layer     |
          |                                                    | (internal/       |
          |                                                    |  linter/)        |
@@ -368,6 +360,10 @@ gcx
   |     (each kind subgroup exposes its own `query` subcommand)
   +-- providers
   |     (single command: list registered providers)
+  +-- setup                (--config, --context as persistent flags)
+  |     +-- status         (aggregated product status)
+  |     +-- instrumentation
+  |           +-- status, discover, show, apply
   +-- dev
         (import, scaffold, generate, lint, serve subcommands for code scaffolding/dev workflows)
 ```
@@ -717,6 +713,28 @@ Files most important for understanding the codebase. Organized by architectural 
 | `internal/providers/fleet/provider.go` | `FleetProvider` implementing the `providers.Provider` interface |
 | `internal/providers/fleet/client.go` | Fleet Management REST client |
 
+### Shared Fleet Client
+
+| File | Purpose |
+|------|---------|
+| `internal/fleet/client.go` | Shared fleet base HTTP client (used by fleet provider and setup/instrumentation) |
+| `internal/fleet/config.go` | Config loading, `LoadClientWithStack` helper |
+| `internal/fleet/errors.go` | Fleet API error types |
+
+### Setup / Instrumentation
+
+| File | Purpose |
+|------|---------|
+| `cmd/gcx/setup/command.go` | Setup command area: aggregated status, wires instrumentation subcommands |
+| `cmd/gcx/setup/instrumentation/command.go` | Instrumentation subcommand group |
+| `cmd/gcx/setup/instrumentation/apply.go` | Apply InstrumentationConfig manifest with optimistic lock |
+| `cmd/gcx/setup/instrumentation/show.go` | Export current remote config as portable manifest |
+| `cmd/gcx/setup/instrumentation/discover.go` | Discover instrumentable workloads |
+| `cmd/gcx/setup/instrumentation/status.go` | Per-cluster instrumentation status with Beyla error query |
+| `internal/setup/instrumentation/types.go` | InstrumentationConfig manifest types |
+| `internal/setup/instrumentation/client.go` | Instrumentation API client (GET/SET app/k8s, discovery, monitoring) |
+| `internal/setup/instrumentation/compare.go` | Optimistic lock diff comparison logic |
+
 ### K6 Cloud Provider
 
 | File | Purpose |
@@ -905,61 +923,6 @@ gcx at it.
 
 ---
 
-## 14. Areas of Uncertainty
-
-**Sections with Lower Confidence:**
-
-- **Testing strategy** (70%): No dedicated analysis of test files. Coverage
-  estimated from cross-references in other domains. Test patterns (table-driven,
-  testdata fixtures) noted but not deeply validated.
-
-- **Retry and timeout behavior** (limited): The k8s client-go transport handles
-  retries internally, but the analysis did not trace specific retry policies,
-  timeout configurations, or backoff behavior.
-
-- **Production deployment patterns**: The codebase is a CLI tool, so "deployment"
-  means distributing binaries. How users actually integrate it into CI/CD
-  pipelines, GitOps workflows, or automated systems is outside the code analysis.
-
-**Recommended for Manual Review:**
-
-- `internal/resources/remote/pusher.go`: The upsert logic and its interaction
-  with resourceVersion conflicts deserves careful review if concurrent pushes
-  are a concern.
-
-- `internal/server/`: The serve command has significant complexity (reverse proxy,
-  WebSocket, file watching, dashboard interception) that warrants deeper review
-  for correctness in edge cases.
-
----
-
-## 15. Synthesis Notes
-
-### Analysis Coverage
-
-- Domains analyzed: 6 (project structure, resource model, CLI layer, client/API, config, data flows)
-- Patterns identified: 10 (see patterns.md)
-- Contradictions resolved: 5 (see patterns.md)
-- Key files referenced: 35+
-
-### Confidence Rationale
-
-Overall confidence of 92% (High) is based on:
-- Six parallel analyzers covered all major code paths and architectural layers
-- Strong agreement between domains on core patterns and design decisions
-- Five minor contradictions resolved with evidence from multiple sources
-- Clear documentation in the codebase (CLAUDE.md, inline comments, code structure)
-- Primary gap: no dedicated test analysis; testing strategy reconstructed from
-  cross-references
-
-### Analysis Limitations
-
-- **Runtime behavior not analyzed.** Static code analysis only; actual API responses,
-  error rates, and performance characteristics are not measured.
-- **Git history not analyzed.** Architectural evolution and decision rationale
-  require examining commit history and PR discussions.
-- **External service integrations not fully traced.** The Grafana API contract is
-  assumed from the k8s-compatible endpoint pattern; actual API behavior may differ.
 - **Serve command edge cases.** The reverse proxy, dashboard interception, and
   live reload have complex interaction patterns that may have subtle issues not
   visible in static analysis.

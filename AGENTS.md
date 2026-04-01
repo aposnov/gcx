@@ -106,13 +106,13 @@ make docs        # Generate + build all documentation
 > ```
 > Skipping this causes CI to fail with docs drift.
 
-> **Update `docs/architecture/` when a PR changes architecture.** Specifically: adding
-> or removing packages under `internal/` or `cmd/`, introducing new architectural
-> patterns, changing core abstractions (Resource, Selector, Filter, Discovery),
-> or adding a new provider. Routine bug fixes, test changes, and small features
-> do not need it. Follow the structural checks in
-> [docs/reference/doc-maintenance.md](docs/reference/doc-maintenance.md) to audit
-> for staleness — keeping these docs accurate prevents agents from making bad
+> **Doc maintenance is a gate before creating a PR or finishing a session.**
+> If code changes touch `internal/` or `cmd/` structure, new architectural patterns,
+> core abstractions (Resource, Selector, Filter, Discovery), or add a provider:
+> run the structural checks in [docs/reference/doc-maintenance.md](docs/reference/doc-maintenance.md)
+> and update `CLAUDE.md` (package map), `DESIGN.md` (package table), and relevant
+> `docs/architecture/` files. Routine bug fixes, test changes, and small features
+> do not need it. Keeping these docs accurate prevents agents from making bad
 > assumptions in future sessions.
 
 ## Package Map
@@ -130,12 +130,17 @@ cmd/gcx/
 ├── linter/      Linting commands (run, new, rules, test — mounted under dev lint)
 ├── commands/    Commands catalog (agent-consumable metadata, resource types, live validation)
 ├── helptree/    Compact text tree for agent context injection (help-tree command)
+├── setup/       Setup command area (onboarding, instrumentation — not a provider)
+│   └── instrumentation/  Instrumentation subcommands (status, discover, show, apply)
 ├── dev/         Developer commands (import, scaffold, generate, lint, serve)
 └── fail/        Structured error → user-friendly message conversion
 
 internal/
 ├── config/      Config types, loader, editor, rest.Config builder, stack-id discovery, context name helpers
 ├── cloud/       GCOM HTTP client for Grafana Cloud stack discovery
+├── fleet/       Shared fleet base client (HTTP, auth, config — used by fleet provider and setup/instrumentation)
+├── setup/
+│   └── instrumentation/  Manifest types, instrumentation client, optimistic lock comparison
 ├── resources/
 │   ├── *.go     Core types: Resource, Selector, Filter, Descriptor, Resources collection
 │   ├── adapter/    ResourceAdapter interface, Factory, ResourceClientRouter, self-registration
