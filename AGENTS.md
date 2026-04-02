@@ -124,8 +124,8 @@ cmd/gcx/
 ├── config/      Config management commands (set, use-context, view...)
 ├── resources/   Resource commands (get, schemas, push, pull, delete, edit, validate)
 ├── dashboards/  Dashboard commands (snapshot via Image Renderer)
-├── datasources/ Datasource commands (list, get, prometheus, loki, pyroscope, tempo, generic)
-│   └── query/   Query subcommand shared infrastructure (codecs, time parsing, per-kind constructors)
+├── datasources/ Datasource commands (list, get, query)
+│   └── query/   Auto-detecting query command (GenericCmd only; shared infra in internal/datasources/query/)
 ├── providers/   Provider list command
 ├── api/         Raw API passthrough command (direct Grafana API calls)
 ├── linter/      Linting commands (run, new, rules, test — mounted under dev lint)
@@ -138,6 +138,7 @@ cmd/gcx/
 
 internal/
 ├── auth/        OAuth PKCE flow, token refresh transport
+│   └── adaptive/  Shared adaptive telemetry auth (GCOM caching, Basic auth — used by signal providers)
 ├── config/      Config types, loader, editor, rest.Config builder, stack-id discovery, context name helpers
 ├── cloud/       GCOM HTTP client for Grafana Cloud stack discovery
 ├── fleet/       Shared fleet base client (HTTP, auth, config — used by fleet provider and setup/instrumentation)
@@ -157,12 +158,17 @@ internal/
 │   ├── incidents/  IRM Incidents provider
 │   ├── k6/         K6 Cloud provider (projects, tests, runs, envvars)
 │   ├── kg/         Knowledge Graph (Asserts) provider
+│   ├── logs/       Logs signal provider (Loki queries + Adaptive Logs commands)
+│   ├── metrics/    Metrics signal provider (Prometheus queries + Adaptive Metrics commands)
 │   ├── oncall/     OnCall provider (schedules, integrations, escalation chains)
 │   ├── appo11y/    App Observability provider (overrides, settings — singleton resources)
+│   ├── profiles/   Profiles signal provider (Pyroscope queries + adaptive stub)
 │   ├── slo/        SLO provider (definitions, reports)
-│   └── synth/      Synthetic Monitoring provider (checks, probes)
+│   ├── synth/      Synthetic Monitoring provider (checks, probes)
+│   └── traces/     Traces signal provider (Tempo queries + Adaptive Traces commands)
 ├── dashboards/  Dashboard Image Renderer client (PNG snapshots)
 ├── datasources/ Datasource HTTP client (legacy REST API)
+│   └── query/   Shared query CLI utils (time parsing, codecs, opts, resolve helpers — used by signal providers and GenericCmd)
 ├── query/       Datasource query clients
 │   ├── prometheus/  Prometheus HTTP query client
 │   └── loki/        Loki HTTP query client
