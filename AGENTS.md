@@ -190,6 +190,7 @@ internal/
 │   ├── assistanthttp/  Base HTTP client for grafana-assistant-app plugin API
 │   └── investigations/ Investigation CRUD commands, table codecs, API client
 ├── agent/       Agent mode detection, command annotations, known-resource registry with operation hints
+├── style/       Terminal styling (Grafana Neon Dark theme, TableBuilder, ASCII banner, glamour help)
 ├── terminal/    TTY/pipe detection (IsPiped, NoTruncate, Detect) for output suppression
 ├── linter/      Linting engine (Rego rules, report aggregation, PromQL/LogQL validators)
 ├── graph/       Terminal chart rendering (ntcharts + lipgloss)
