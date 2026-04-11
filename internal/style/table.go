@@ -3,12 +3,11 @@ package style
 import (
 	"fmt"
 	"io"
-	"os"
 	"text/tabwriter"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-	"golang.org/x/term"
+	"github.com/grafana/gcx/internal/terminal"
 )
 
 // TableBuilder constructs styled tables that degrade gracefully to plain
@@ -102,7 +101,7 @@ func (tb *TableBuilder) renderStyled(w io.Writer) error {
 }
 
 func terminalWidth() int {
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+	if w := terminal.StdoutWidth(); w > 0 {
 		return w
 	}
 	return 80
