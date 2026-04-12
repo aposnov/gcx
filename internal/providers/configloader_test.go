@@ -706,3 +706,118 @@ current-context: default
 	assert.Equal(t, "https://fleet.example.com", got.Stack.AgentManagementInstanceURL)
 	assert.Equal(t, "default", got.Namespace)
 }
+
+func TestConfigLoader_SaveProviderConfig_ContextOverrideBeforeEnvVars(t *testing.T) {
+	cfgFile := writeConfigFile(t, `
+contexts:
+  prod:
+    providers:
+      synth:
+        sm-url: https://prod.sm
+  staging:
+    providers:
+      synth:
+        sm-url: https://staging.sm
+current-context: prod
+`)
+	t.Setenv("GRAFANA_PROVIDER_SYNTH_SM-TOKEN", "env-sm-token")
+
+	loader := &providers.ConfigLoader{}
+	loader.SetConfigFile(cfgFile)
+	loader.SetContextName("staging")
+
+	err := loader.SaveProviderConfig(context.Background(), "synth", "extra-key", "extra-val")
+	require.NoError(t, err)
+
+	// Reload and verify the save targeted the staging context.
+	got, _, err := loader.LoadProviderConfig(context.Background(), "synth")
+	require.NoError(t, err)
+	assert.Equal(t, "https://staging.sm", got["sm-url"])
+	assert.Equal(t, "extra-val", got["extra-key"])
+	assert.Equal(t, "env-sm-token", got["sm-token"])
+}
+
+func TestConfigLoader_LoadFullConfig_ContextOverrideBeforeEnvVars(t *testing.T) {
+	cfgFile := writeConfigFile(t, `
+contexts:
+  prod:
+    grafana:
+      server: https://prod.grafana.net
+      token: prod-token
+  staging:
+    grafana:
+      server: https://staging.grafana.net
+      token: staging-token
+current-context: prod
+`)
+	t.Setenv("GRAFANA_TOKEN", "env-token")
+
+	loader := &providers.ConfigLoader{}
+	loader.SetConfigFile(cfgFile)
+	loader.SetContextName("staging")
+
+	cfg, err := loader.LoadFullConfig(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "staging", cfg.CurrentContext)
+	assert.Equal(t, "env-token", cfg.Contexts["staging"].Grafana.APIToken)
+	assert.Equal(t, "https://staging.grafana.net", cfg.Contexts["staging"].Grafana.Server)
+}
+
+func TestConfigLoader_LoadGrafanaConfig_ContextOverrideBeforeEnvVars(t *testing.T) {
+	cfgFile := writeConfigFile(t, `
+contexts:
+  prod:
+    grafana:
+      server: https://prod.grafana.net
+      token: prod-token
+  staging:
+    grafana:
+      server: https://staging.grafana.net
+      token: staging-token
+current-context: prod
+`)
+	t.Setenv("GRAFANA_TOKEN", "env-token")
+
+	loader := &providers.ConfigLoader{}
+	loader.SetConfigFile(cfgFile)
+	loader.SetContextName("staging")
+
+	restCfg, err := loader.LoadGrafanaConfig(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "https://staging.grafana.net", restCfg.Host)
+	assert.Equal(t, "env-token", restCfg.BearerToken)
+	assert.NotEqual(t, "https://prod.grafana.net", restCfg.Host)
+}
+
+func TestConfigLoader_LoadCloudConfig_ContextOverrideBeforeEnvVars(t *testing.T) {
+	wantStack := cloud.StackInfo{ID: 7, Slug: "staging-stack", Name: "Staging"}
+	srv := newMockGCOMServer(t, wantStack)
+	defer srv.Close()
+
+	cfgFile := writeConfigFile(t, `
+contexts:
+  prod:
+    cloud:
+      token: prod-token
+      stack: prod-stack
+      api-url: `+srv.URL+`
+  staging:
+    cloud:
+      token: staging-token
+      stack: staging-stack
+      api-url: `+srv.URL+`
+current-context: prod
+`)
+	t.Setenv("GRAFANA_CLOUD_TOKEN", "env-cloud-token")
+
+	loader := &providers.ConfigLoader{}
+	loader.SetConfigFile(cfgFile)
+	loader.SetContextName("staging")
+
+	cloudCfg, err := loader.LoadCloudConfig(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "env-cloud-token", cloudCfg.Token)
+	assert.Equal(t, "staging-stack", cloudCfg.Stack.Slug)
+	assert.Equal(t, 7, cloudCfg.Stack.ID)
+	assert.NotEqual(t, "prod-stack", cloudCfg.Stack.Slug)
+}
