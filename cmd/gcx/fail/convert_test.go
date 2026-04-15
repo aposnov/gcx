@@ -171,3 +171,35 @@ func TestErrorToDetailedError_CobraUnknownCommandError(t *testing.T) {
 	require.Len(t, got.Suggestions, 1)
 	assert.Equal(t, "Run 'gcx kg --help' for full usage and examples", got.Suggestions[0])
 }
+
+func TestErrorToDetailedError_SMURLNotConfigured(t *testing.T) {
+	err := fmt.Errorf("failed to load SM config for checks: %w",
+		fmt.Errorf("SM URL not configured: %w", errors.New("no Grafana server configured: grafana config is required")))
+
+	got := fail.ErrorToDetailedError(err)
+
+	require.NotNil(t, got)
+	assert.Equal(t, "SM URL not configured", got.Summary)
+	assert.Contains(t, got.Details, "SM URL not configured")
+	require.Len(t, got.Suggestions, 4)
+	assert.Contains(t, got.Suggestions[0], "gcx config set providers.synth.sm-url")
+	assert.Contains(t, got.Suggestions[1], "GRAFANA_PROVIDER_SYNTH_SM_URL")
+	assert.Contains(t, got.Suggestions[2], "grafana.server")
+	assert.Contains(t, got.Suggestions[3], "gcx config view")
+}
+
+func TestErrorToDetailedError_SMTokenNotConfigured(t *testing.T) {
+	err := fmt.Errorf("failed to load SM config for checks: %w",
+		fmt.Errorf("SM token not configured: %w", errors.New("no cloud config: cloud token is required")))
+
+	got := fail.ErrorToDetailedError(err)
+
+	require.NotNil(t, got)
+	assert.Equal(t, "SM token not configured", got.Summary)
+	assert.Contains(t, got.Details, "SM token not configured")
+	require.Len(t, got.Suggestions, 4)
+	assert.Contains(t, got.Suggestions[0], "gcx config set providers.synth.sm-token")
+	assert.Contains(t, got.Suggestions[1], "GRAFANA_PROVIDER_SYNTH_SM_TOKEN")
+	assert.Contains(t, got.Suggestions[2], "cloud.token")
+	assert.Contains(t, got.Suggestions[3], "gcx config view")
+}
