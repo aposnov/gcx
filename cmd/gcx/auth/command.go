@@ -2,12 +2,12 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"unicode"
 
 	configcmd "github.com/grafana/gcx/cmd/gcx/config"
-	"github.com/grafana/gcx/cmd/gcx/fail"
 	internalauth "github.com/grafana/gcx/internal/auth"
 	"github.com/grafana/gcx/internal/config"
 	"github.com/spf13/cobra"
@@ -73,12 +73,6 @@ your identity and RBAC permissions.
 If --server is provided, gcx uses that server for this login and saves it to
 the selected context. This lets you bootstrap auth without preconfiguring
 grafana.server.
-
-Without --server, the selected context must already define grafana.server. For
-example:
-	gcx config set contexts.my-stack.grafana.server https://my-stack.grafana.net
-	gcx config use-context my-stack
-
 ` + fmt.Sprintf(unsupportedCommandsWarningTemplate, "contexts.CONTEXT.grafana.token"),
 		Example: `  gcx auth login --server https://my-stack.grafana.net
   gcx auth login --context prod --server https://prod.grafana.net
@@ -106,15 +100,15 @@ func runLogin(cmd *cobra.Command, opts *loginOpts) error {
 
 	curCtx := cfg.GetCurrentContext()
 	if curCtx == nil || curCtx.Grafana == nil || curCtx.Grafana.Server == "" {
-		return fail.DetailedError{
-			Summary: "Grafana server not configured",
-			Details: fmt.Sprintf("Context %q does not define grafana.server.", cfg.CurrentContext),
-			Suggestions: []string{
-				fmt.Sprintf("Set it: gcx config set %s https://my-stack.grafana.net", formatConfigPathArg("contexts", cfg.CurrentContext, "grafana", "server")),
-				"Or pass it now: gcx auth login --server https://my-stack.grafana.net",
-				"Or switch context: gcx config use-context my-context",
-			},
-		}
+		// if no context or server is configured, we can redirect to gcom to figure out things
+		fmt.Fprintf(cmd.ErrOrStderr(), "No existing context found, using sign-in flow\n")
+
+		// create empty config to prevent nil pointers
+		ctx := &config.Context{Grafana: &config.GrafanaConfig{}}
+		cfg.SetContext(cfg.CurrentContext, true, *ctx)
+		curCtx = cfg.GetCurrentContext()
+	} else if curCtx.Grafana == nil {
+		curCtx.Grafana = &config.GrafanaConfig{}
 	}
 
 	flow := opts.NewFlow(curCtx.Grafana.Server, internalauth.Options{
@@ -131,6 +125,13 @@ func runLogin(cmd *cobra.Command, opts *loginOpts) error {
 	curCtx.Grafana.OAuthRefreshToken = result.RefreshToken
 	curCtx.Grafana.OAuthTokenExpiresAt = result.ExpiresAt
 	curCtx.Grafana.OAuthRefreshExpiresAt = result.RefreshExpiresAt
+	if curCtx.Grafana.Server == "" {
+		// we didn't know the instance endpoint before signing in
+		if result.InstanceEndpoint == "" {
+			return errors.New("instance did not provide its endpoint url")
+		}
+		curCtx.Grafana.Server = result.InstanceEndpoint
+	}
 
 	if err := config.Write(ctx, opts.Config.ConfigSource(), cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
