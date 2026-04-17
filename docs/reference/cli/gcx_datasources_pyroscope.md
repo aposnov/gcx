@@ -1,34 +1,13 @@
-## gcx datasources get
+## gcx datasources pyroscope
 
-Get details of a specific datasource
-
-### Synopsis
-
-Get detailed information about a specific datasource by its UID.
-
-```
-gcx datasources get UID [flags]
-```
-
-### Examples
-
-```
-
-	# Get datasource details
-	gcx datasources get my-prometheus
-
-	# Output as JSON
-	gcx datasources get my-prometheus -o json
-```
+Query Pyroscope datasources
 
 ### Options
 
 ```
       --config string    Path to the configuration file to use
       --context string   Name of the context to use
-  -h, --help             help for get
-      --json string      Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -o, --output string    Output format. One of: json, yaml (default "yaml")
+  -h, --help             help for pyroscope
 ```
 
 ### Options inherited from parent commands
@@ -44,4 +23,8 @@ gcx datasources get UID [flags]
 ### SEE ALSO
 
 * [gcx datasources](gcx_datasources.md)	 - Manage and query Grafana datasources
+* [gcx datasources pyroscope labels](gcx_datasources_pyroscope_labels.md)	 - List labels or label values
+* [gcx datasources pyroscope metrics](gcx_datasources_pyroscope_metrics.md)	 - Query profile time-series data from a Pyroscope datasource
+* [gcx datasources pyroscope profile-types](gcx_datasources_pyroscope_profile-types.md)	 - List available profile types
+* [gcx datasources pyroscope query](gcx_datasources_pyroscope_query.md)	 - Execute a profiling query against a Pyroscope datasource
 

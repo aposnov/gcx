@@ -1,34 +1,13 @@
-## gcx datasources get
+## gcx datasources prometheus
 
-Get details of a specific datasource
-
-### Synopsis
-
-Get detailed information about a specific datasource by its UID.
-
-```
-gcx datasources get UID [flags]
-```
-
-### Examples
-
-```
-
-	# Get datasource details
-	gcx datasources get my-prometheus
-
-	# Output as JSON
-	gcx datasources get my-prometheus -o json
-```
+Query Prometheus datasources
 
 ### Options
 
 ```
       --config string    Path to the configuration file to use
       --context string   Name of the context to use
-  -h, --help             help for get
-      --json string      Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -o, --output string    Output format. One of: json, yaml (default "yaml")
+  -h, --help             help for prometheus
 ```
 
 ### Options inherited from parent commands
@@ -44,4 +23,7 @@ gcx datasources get UID [flags]
 ### SEE ALSO
 
 * [gcx datasources](gcx_datasources.md)	 - Manage and query Grafana datasources
+* [gcx datasources prometheus labels](gcx_datasources_prometheus_labels.md)	 - List labels or label values
+* [gcx datasources prometheus metadata](gcx_datasources_prometheus_metadata.md)	 - Get metric metadata
+* [gcx datasources prometheus query](gcx_datasources_prometheus_query.md)	 - Execute a PromQL query against a Prometheus datasource
 

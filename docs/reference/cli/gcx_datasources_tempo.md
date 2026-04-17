@@ -1,34 +1,13 @@
-## gcx datasources get
+## gcx datasources tempo
 
-Get details of a specific datasource
-
-### Synopsis
-
-Get detailed information about a specific datasource by its UID.
-
-```
-gcx datasources get UID [flags]
-```
-
-### Examples
-
-```
-
-	# Get datasource details
-	gcx datasources get my-prometheus
-
-	# Output as JSON
-	gcx datasources get my-prometheus -o json
-```
+Query Tempo datasources
 
 ### Options
 
 ```
       --config string    Path to the configuration file to use
       --context string   Name of the context to use
-  -h, --help             help for get
-      --json string      Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -o, --output string    Output format. One of: json, yaml (default "yaml")
+  -h, --help             help for tempo
 ```
 
 ### Options inherited from parent commands
@@ -44,4 +23,8 @@ gcx datasources get UID [flags]
 ### SEE ALSO
 
 * [gcx datasources](gcx_datasources.md)	 - Manage and query Grafana datasources
+* [gcx datasources tempo get](gcx_datasources_tempo_get.md)	 - Retrieve a trace by ID
+* [gcx datasources tempo labels](gcx_datasources_tempo_labels.md)	 - List trace labels or label values
+* [gcx datasources tempo metrics](gcx_datasources_tempo_metrics.md)	 - Execute a TraceQL metrics query
+* [gcx datasources tempo query](gcx_datasources_tempo_query.md)	 - Search for traces using a TraceQL query
 

@@ -15,10 +15,10 @@ gcx profiles profile-types [flags]
 ```
 
   # List profile types (use datasource UID, not name)
-  gcx profiles profile-types -d <datasource-uid>
+  gcx profiles profile-types -d UID
 
   # Output as JSON
-  gcx profiles profile-types -d <datasource-uid> -o json
+  gcx profiles profile-types -d UID -o json
 ```
 
 ### Options

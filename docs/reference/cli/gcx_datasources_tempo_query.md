@@ -1,39 +1,47 @@
-## gcx traces get
+## gcx datasources tempo query
 
-Retrieve a trace by ID
+Search for traces using a TraceQL query
 
 ### Synopsis
 
-Retrieve a single trace by its trace ID from a Tempo datasource.
+Search for traces using a TraceQL query against a Tempo datasource.
 
-TRACE_ID is the hex-encoded trace identifier to retrieve.
+TRACEQL is the TraceQL expression to evaluate.
 Datasource is resolved from -d flag or datasources.tempo in your context.
 
 ```
-gcx traces get TRACE_ID [flags]
+gcx datasources tempo query [TRACEQL] [flags]
 ```
 
 ### Examples
 
 ```
 
-  # Fetch a trace by ID
-  gcx traces get -d UID <trace-id>
+  # Search traces using configured default datasource
+  gcx datasources tempo query '{ span.http.status_code >= 500 }'
+
+  # Search with explicit datasource UID and time range
+  gcx datasources tempo query -d UID '{ span.http.status_code >= 500 }' --since 1h
+
+  # With custom limit
+  gcx datasources tempo query -d UID '{ span.http.status_code >= 500 }' --since 1h --limit 50
 
   # Output as JSON
-  gcx traces get -d UID <trace-id> -o json
+  gcx datasources tempo query -d UID '{ span.http.status_code >= 500 }' -o json
 ```
 
 ### Options
 
 ```
   -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
+      --expr string         Query expression (alternative to positional argument)
       --from string         Start time (RFC3339, Unix timestamp, or relative like 'now-1h')
-  -h, --help                help for get
+  -h, --help                help for query
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-      --llm                 Request LLM-friendly trace format
-  -o, --output string       Output format. One of: json, yaml (default "json")
+      --limit int           Maximum number of traces to return (0 means no limit) (default 20)
+  -o, --output string       Output format. One of: json, table, wide, yaml (default "table")
       --since string        Duration before --to (or now if omitted); mutually exclusive with --from
+      --step string         Query step (e.g., '15s', '1m')
       --to string           End time (RFC3339, Unix timestamp, or relative like 'now')
 ```
 
@@ -51,5 +59,5 @@ gcx traces get TRACE_ID [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources tempo](gcx_datasources_tempo.md)	 - Query Tempo datasources
 

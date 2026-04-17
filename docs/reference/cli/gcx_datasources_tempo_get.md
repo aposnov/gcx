@@ -1,4 +1,4 @@
-## gcx traces get
+## gcx datasources tempo get
 
 Retrieve a trace by ID
 
@@ -10,18 +10,24 @@ TRACE_ID is the hex-encoded trace identifier to retrieve.
 Datasource is resolved from -d flag or datasources.tempo in your context.
 
 ```
-gcx traces get TRACE_ID [flags]
+gcx datasources tempo get TRACE_ID [flags]
 ```
 
 ### Examples
 
 ```
 
-  # Fetch a trace by ID
-  gcx traces get -d UID <trace-id>
+  # Get a trace using configured default datasource
+  gcx datasources tempo get abc123def456
 
-  # Output as JSON
-  gcx traces get -d UID <trace-id> -o json
+  # Get a trace with explicit datasource UID
+  gcx datasources tempo get -d tempo-001 abc123def456
+
+  # Get LLM-friendly output
+  gcx datasources tempo get abc123def456 --llm
+
+  # Get a trace within a time range
+  gcx datasources tempo get abc123def456 --since 1h
 ```
 
 ### Options
@@ -51,5 +57,5 @@ gcx traces get TRACE_ID [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources tempo](gcx_datasources_tempo.md)	 - Query Tempo datasources
 

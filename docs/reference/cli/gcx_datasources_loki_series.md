@@ -1,41 +1,40 @@
-## gcx traces labels
+## gcx datasources loki series
 
-List trace labels or label values
+List log streams
 
 ### Synopsis
 
-List all trace labels or get values for a specific label from a Tempo datasource.
-
-When -l/--label is provided, returns values for that label.
-When -l is omitted, returns all label names.
-
-Datasource is resolved from -d flag or datasources.tempo in your context.
+List log streams (series) from a Loki datasource using LogQL stream selectors. At least one --match selector is required.
 
 ```
-gcx traces labels [flags]
+gcx datasources loki series [flags]
 ```
 
 ### Examples
 
 ```
 
-  # List all labels
-  gcx traces labels -d UID
+	# List series matching a selector (use datasource UID, not name)
+	gcx datasources loki series -d UID --match '{job="varlogs"}'
 
-  # Output as JSON
-  gcx traces labels -d UID -o json
+	# Match with regex and multiple labels
+	gcx datasources loki series -d UID --match '{container_name=~"prometheus.*", component="server"}'
+
+	# Multiple matchers (OR logic)
+	gcx datasources loki series -d UID --match '{job="varlogs"}' --match '{namespace="default"}'
+
+	# Output as JSON
+	gcx datasources loki series -d UID --match '{job="varlogs"}' -o json
 ```
 
 ### Options
 
 ```
-  -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
-  -h, --help                help for labels
+  -d, --datasource string   Datasource UID (required unless default-loki-datasource is configured)
+  -h, --help                help for series
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -l, --label string        Get values for this label (omit to list all labels)
+  -M, --match stringArray   LogQL stream selector (required, e.g., '{job="varlogs"}')
   -o, --output string       Output format. One of: json, table, yaml (default "table")
-  -q, --query string        TraceQL query to filter labels
-      --scope string        Tag scope filter (resource, span, event, link, instrumentation)
 ```
 
 ### Options inherited from parent commands
@@ -52,5 +51,5 @@ gcx traces labels [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources loki](gcx_datasources_loki.md)	 - Query Loki datasources
 

@@ -1,42 +1,48 @@
-## gcx traces metrics
+## gcx datasources loki metrics
 
-Execute a TraceQL metrics query
+Execute a metric LogQL query against a Loki datasource
 
 ### Synopsis
 
-Execute a TraceQL metrics query against a Tempo datasource.
+Execute a metric LogQL query and return time-series results.
 
-TRACEQL is the TraceQL metrics expression to evaluate.
-Datasource is resolved from -d flag or datasources.tempo in your context.
+EXPR is a metric LogQL expression (e.g., rate, count_over_time, sum).
+Datasource is resolved from -d flag or datasources.loki in your context.
+
+Unlike 'logs query' which returns log lines, 'logs metrics' returns
+time-series data with proper table, graph, and JSON formatters.
 
 Instant vs range is deduced from time flags: no time flags = instant query,
---since or --from/--to = range query. Use --instant to force an instant query
-even when a time range is provided. If no time flags are set, gcx queries the
-last hour by default.
+--since or --from/--to = range query.
 
 ```
-gcx traces metrics [TRACEQL] [flags]
+gcx datasources loki metrics [EXPR] [flags]
 ```
 
 ### Examples
 
 ```
 
-  # Run a TraceQL metrics query
-  gcx traces metrics -d UID '{ } | rate()' --since 1h
+  # Rate of log lines over 5 minutes
+  gcx datasources loki metrics 'rate({job="varlogs"}[5m])' --since 1h -o table
+
+  # Count of error logs
+  gcx datasources loki metrics 'count_over_time({job="varlogs"} |= "error" [5m])' --since 1h
+
+  # Line chart output
+  gcx datasources loki metrics -d loki-001 'rate({job="varlogs"}[5m])' --since 1h -o graph
 
   # Output as JSON
-  gcx traces metrics -d UID '{ } | rate()' --since 1h -o json
+  gcx datasources loki metrics 'rate({job="varlogs"}[5m])' --since 1h -o json
 ```
 
 ### Options
 
 ```
-  -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
+  -d, --datasource string   Datasource UID (required unless datasources.loki is configured)
       --expr string         Query expression (alternative to positional argument)
       --from string         Start time (RFC3339, Unix timestamp, or relative like 'now-1h')
   -h, --help                help for metrics
-      --instant             Run an instant query over the selected time range instead of a range query
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
   -o, --output string       Output format. One of: graph, json, table, wide, yaml (default "table")
       --since string        Duration before --to (or now if omitted); mutually exclusive with --from
@@ -58,5 +64,5 @@ gcx traces metrics [TRACEQL] [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources loki](gcx_datasources_loki.md)	 - Query Loki datasources
 

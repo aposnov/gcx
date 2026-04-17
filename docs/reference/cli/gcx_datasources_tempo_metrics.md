@@ -1,4 +1,4 @@
-## gcx traces metrics
+## gcx datasources tempo metrics
 
 Execute a TraceQL metrics query
 
@@ -15,18 +15,27 @@ even when a time range is provided. If no time flags are set, gcx queries the
 last hour by default.
 
 ```
-gcx traces metrics [TRACEQL] [flags]
+gcx datasources tempo metrics [TRACEQL] [flags]
 ```
 
 ### Examples
 
 ```
 
-  # Run a TraceQL metrics query
-  gcx traces metrics -d UID '{ } | rate()' --since 1h
+  # Instant query over the last hour (default, no time flags)
+  gcx datasources tempo metrics '{ } | rate()'
+
+  # Range query with relative window
+  gcx datasources tempo metrics -d tempo-001 '{ } | rate()' --since 1h
+
+  # Instant query with explicit time range
+  gcx datasources tempo metrics '{ } | rate()' --instant --since 1h
+
+  # Range query with explicit time range and step
+  gcx datasources tempo metrics '{ } | rate()' --from now-1h --to now --step 30s
 
   # Output as JSON
-  gcx traces metrics -d UID '{ } | rate()' --since 1h -o json
+  gcx datasources tempo metrics -d tempo-001 '{ } | rate()' -o json
 ```
 
 ### Options
@@ -58,5 +67,5 @@ gcx traces metrics [TRACEQL] [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources tempo](gcx_datasources_tempo.md)	 - Query Tempo datasources
 

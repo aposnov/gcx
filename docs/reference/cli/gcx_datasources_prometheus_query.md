@@ -1,42 +1,43 @@
-## gcx traces metrics
+## gcx datasources prometheus query
 
-Execute a TraceQL metrics query
+Execute a PromQL query against a Prometheus datasource
 
 ### Synopsis
 
-Execute a TraceQL metrics query against a Tempo datasource.
+Execute a PromQL query against a Prometheus datasource.
 
-TRACEQL is the TraceQL metrics expression to evaluate.
-Datasource is resolved from -d flag or datasources.tempo in your context.
-
-Instant vs range is deduced from time flags: no time flags = instant query,
---since or --from/--to = range query. Use --instant to force an instant query
-even when a time range is provided. If no time flags are set, gcx queries the
-last hour by default.
+EXPR is the PromQL expression to evaluate, passed as a positional argument or
+via --expr (familiar to promtool users).
+Datasource is resolved from -d flag or datasources.prometheus in your context.
 
 ```
-gcx traces metrics [TRACEQL] [flags]
+gcx datasources prometheus query [EXPR] [flags]
 ```
 
 ### Examples
 
 ```
 
-  # Run a TraceQL metrics query
-  gcx traces metrics -d UID '{ } | rate()' --since 1h
+  # Instant query using configured default datasource
+  gcx datasources prometheus query 'up{job="grafana"}'
+
+  # Range query with explicit datasource UID
+  gcx datasources prometheus query -d UID 'rate(http_requests_total[5m])' --from now-1h --to now --step 1m
+
+  # Query the last hour
+  gcx datasources prometheus query 'up' --since 1h
 
   # Output as JSON
-  gcx traces metrics -d UID '{ } | rate()' --since 1h -o json
+  gcx datasources prometheus query -d UID 'up' -o json
 ```
 
 ### Options
 
 ```
-  -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
+  -d, --datasource string   Datasource UID (required unless datasources.prometheus is configured)
       --expr string         Query expression (alternative to positional argument)
       --from string         Start time (RFC3339, Unix timestamp, or relative like 'now-1h')
-  -h, --help                help for metrics
-      --instant             Run an instant query over the selected time range instead of a range query
+  -h, --help                help for query
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
   -o, --output string       Output format. One of: graph, json, table, wide, yaml (default "table")
       --since string        Duration before --to (or now if omitted); mutually exclusive with --from
@@ -58,5 +59,5 @@ gcx traces metrics [TRACEQL] [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources prometheus](gcx_datasources_prometheus.md)	 - Query Prometheus datasources
 

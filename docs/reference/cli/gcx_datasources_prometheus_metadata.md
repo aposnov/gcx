@@ -1,41 +1,37 @@
-## gcx traces labels
+## gcx datasources prometheus metadata
 
-List trace labels or label values
+Get metric metadata
 
 ### Synopsis
 
-List all trace labels or get values for a specific label from a Tempo datasource.
-
-When -l/--label is provided, returns values for that label.
-When -l is omitted, returns all label names.
-
-Datasource is resolved from -d flag or datasources.tempo in your context.
+Get metadata (type, help text) for metrics from a Prometheus datasource.
 
 ```
-gcx traces labels [flags]
+gcx datasources prometheus metadata [flags]
 ```
 
 ### Examples
 
 ```
 
-  # List all labels
-  gcx traces labels -d UID
+	# Get all metric metadata (use datasource UID, not name)
+	gcx datasources prometheus metadata -d UID
 
-  # Output as JSON
-  gcx traces labels -d UID -o json
+	# Get metadata for a specific metric
+	gcx datasources prometheus metadata -d UID --metric http_requests_total
+
+	# Output as JSON
+	gcx datasources prometheus metadata -d UID -o json
 ```
 
 ### Options
 
 ```
-  -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
-  -h, --help                help for labels
+  -d, --datasource string   Datasource UID (required unless default-prometheus-datasource is configured)
+  -h, --help                help for metadata
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -l, --label string        Get values for this label (omit to list all labels)
+  -m, --metric string       Filter by metric name
   -o, --output string       Output format. One of: json, table, yaml (default "table")
-  -q, --query string        TraceQL query to filter labels
-      --scope string        Tag scope filter (resource, span, event, link, instrumentation)
 ```
 
 ### Options inherited from parent commands
@@ -52,5 +48,5 @@ gcx traces labels [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources prometheus](gcx_datasources_prometheus.md)	 - Query Prometheus datasources
 

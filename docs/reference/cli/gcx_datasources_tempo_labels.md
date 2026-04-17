@@ -1,4 +1,4 @@
-## gcx traces labels
+## gcx datasources tempo labels
 
 List trace labels or label values
 
@@ -12,7 +12,7 @@ When -l is omitted, returns all label names.
 Datasource is resolved from -d flag or datasources.tempo in your context.
 
 ```
-gcx traces labels [flags]
+gcx datasources tempo labels [flags]
 ```
 
 ### Examples
@@ -20,10 +20,22 @@ gcx traces labels [flags]
 ```
 
   # List all labels
-  gcx traces labels -d UID
+  gcx datasources tempo labels -d UID
+
+  # Get values for a specific label
+  gcx datasources tempo labels -d UID -l service.name
+
+  # Using the tags alias
+  gcx datasources tempo tags -d UID -l service.name
+
+  # Filter by scope
+  gcx datasources tempo labels -d UID -l service.name --scope span
+
+  # Filter with a TraceQL query
+  gcx datasources tempo labels -d UID -q '{ span.http.status_code >= 500 }'
 
   # Output as JSON
-  gcx traces labels -d UID -o json
+  gcx datasources tempo labels -d UID -o json
 ```
 
 ### Options
@@ -52,5 +64,5 @@ gcx traces labels [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources tempo](gcx_datasources_tempo.md)	 - Query Tempo datasources
 

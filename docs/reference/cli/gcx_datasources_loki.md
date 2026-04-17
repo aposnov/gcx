@@ -1,34 +1,13 @@
-## gcx datasources get
+## gcx datasources loki
 
-Get details of a specific datasource
-
-### Synopsis
-
-Get detailed information about a specific datasource by its UID.
-
-```
-gcx datasources get UID [flags]
-```
-
-### Examples
-
-```
-
-	# Get datasource details
-	gcx datasources get my-prometheus
-
-	# Output as JSON
-	gcx datasources get my-prometheus -o json
-```
+Query Loki datasources
 
 ### Options
 
 ```
       --config string    Path to the configuration file to use
       --context string   Name of the context to use
-  -h, --help             help for get
-      --json string      Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -o, --output string    Output format. One of: json, yaml (default "yaml")
+  -h, --help             help for loki
 ```
 
 ### Options inherited from parent commands
@@ -44,4 +23,8 @@ gcx datasources get UID [flags]
 ### SEE ALSO
 
 * [gcx datasources](gcx_datasources.md)	 - Manage and query Grafana datasources
+* [gcx datasources loki labels](gcx_datasources_loki_labels.md)	 - List labels or label values
+* [gcx datasources loki metrics](gcx_datasources_loki_metrics.md)	 - Execute a metric LogQL query against a Loki datasource
+* [gcx datasources loki query](gcx_datasources_loki_query.md)	 - Execute a LogQL query against a Loki datasource
+* [gcx datasources loki series](gcx_datasources_loki_series.md)	 - List log streams
 

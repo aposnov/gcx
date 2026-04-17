@@ -1,41 +1,33 @@
-## gcx traces labels
+## gcx datasources pyroscope profile-types
 
-List trace labels or label values
+List available profile types
 
 ### Synopsis
 
-List all trace labels or get values for a specific label from a Tempo datasource.
-
-When -l/--label is provided, returns values for that label.
-When -l is omitted, returns all label names.
-
-Datasource is resolved from -d flag or datasources.tempo in your context.
+List available profile types from a Pyroscope datasource.
 
 ```
-gcx traces labels [flags]
+gcx datasources pyroscope profile-types [flags]
 ```
 
 ### Examples
 
 ```
 
-  # List all labels
-  gcx traces labels -d UID
+	# List profile types (use datasource UID, not name)
+	gcx datasources pyroscope profile-types -d UID
 
-  # Output as JSON
-  gcx traces labels -d UID -o json
+	# Output as JSON
+	gcx datasources pyroscope profile-types -d UID -o json
 ```
 
 ### Options
 
 ```
-  -d, --datasource string   Datasource UID (required unless datasources.tempo is configured)
-  -h, --help                help for labels
+  -d, --datasource string   Datasource UID (required unless default-pyroscope-datasource is configured)
+  -h, --help                help for profile-types
       --json string         Comma-separated list of fields to include in JSON output, or 'list' (or '?') to discover available fields
-  -l, --label string        Get values for this label (omit to list all labels)
   -o, --output string       Output format. One of: json, table, yaml (default "table")
-  -q, --query string        TraceQL query to filter labels
-      --scope string        Tag scope filter (resource, span, event, link, instrumentation)
 ```
 
 ### Options inherited from parent commands
@@ -52,5 +44,5 @@ gcx traces labels [flags]
 
 ### SEE ALSO
 
-* [gcx traces](gcx_traces.md)	 - Query Tempo datasources and manage Adaptive Traces
+* [gcx datasources pyroscope](gcx_datasources_pyroscope.md)	 - Query Pyroscope datasources
 
