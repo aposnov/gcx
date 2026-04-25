@@ -93,8 +93,23 @@ func cloudEnvOverride(cfg *config.Config) error {
 	if curCtx.Cloud == nil {
 		curCtx.Cloud = &config.CloudConfig{}
 	}
+	// Initialize nested pointers so env.Parse can populate GRAFANA_TLS_* env vars.
+	if curCtx.Grafana == nil {
+		curCtx.Grafana = &config.GrafanaConfig{}
+	}
+	if curCtx.Grafana.TLS == nil {
+		curCtx.Grafana.TLS = &config.TLS{}
+	}
 
-	return env.Parse(curCtx)
+	if err := env.Parse(curCtx); err != nil {
+		return err
+	}
+
+	// Nil out TLS if no fields were set, so IsEmpty() checks work correctly.
+	if curCtx.Grafana.TLS.IsEmpty() {
+		curCtx.Grafana.TLS = nil
+	}
+	return nil
 }
 
 // contextMustExist is a config.Override that validates the current context exists.
@@ -140,9 +155,19 @@ func envOverride(cfg *config.Config) error {
 	if curCtx.Grafana == nil {
 		curCtx.Grafana = &config.GrafanaConfig{}
 	}
+	// Initialize TLS pointer so env.Parse can populate GRAFANA_TLS_* env vars
+	// into the nested struct (same fix as cmd/gcx/config/command.go).
+	if curCtx.Grafana.TLS == nil {
+		curCtx.Grafana.TLS = &config.TLS{}
+	}
 
 	if err := env.Parse(curCtx); err != nil {
 		return err
+	}
+
+	// Nil out TLS if no fields were set, so IsEmpty() checks work correctly.
+	if curCtx.Grafana.TLS.IsEmpty() {
+		curCtx.Grafana.TLS = nil
 	}
 
 	// Resolve GRAFANA_PROVIDER_{NAME}_{KEY} environment variables.

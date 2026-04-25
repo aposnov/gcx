@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -41,6 +42,13 @@ type Inputs struct {
 	// instance selector
 	UseCloudInstanceSelector bool
 
+	// TLS carries client-side TLS settings (mTLS cert/key, custom CA).
+	// When non-nil, these settings are used for target detection, connectivity
+	// validation, and persisted into the new/updated context.
+	// On re-auth of an existing context, the CLI pre-populates this from the
+	// stored grafana.tls.* block so mTLS keeps working without re-specifying certs.
+	TLS *config.TLS
+
 	// Writer receives human-facing OAuth progress output. When nil, the
 	// internal/login package discards writes (NC-001: the package is UI-free
 	// and never touches os.Stderr on its own). CLI callers should pass
@@ -68,7 +76,8 @@ type Hooks struct {
 	ValidateFn func(ctx context.Context, opts Options, restCfg config.NamespacedRESTConfig) (string, error)
 
 	// DetectFn overrides target detection for testing. When nil,
-	// DetectTarget with httputils.NewDefaultClient(ctx) is used.
+	// DetectTarget is called with a TLS-aware HTTP client (built from
+	// opts.TLS) or a default client when no TLS is configured.
 	DetectFn func(ctx context.Context, server string) (Target, error)
 }
 
@@ -198,7 +207,7 @@ func Run(ctx context.Context, opts *Options) (Result, error) {
 		opts.Server = "https://" + opts.Server
 	}
 
-	// Step 2: detect target
+	// Step 2: detect target (using TLS-aware client when mTLS is configured)
 	target := opts.Target
 	if target == TargetUnknown {
 		detected, err := detectTarget(ctx, *opts)
@@ -303,11 +312,30 @@ func Run(ctx context.Context, opts *Options) (Result, error) {
 }
 
 // detectTarget calls DetectFn or falls back to the real DetectTarget.
+// When TLS settings are present, builds a TLS-aware HTTP client for the probe.
 func detectTarget(ctx context.Context, opts Options) (Target, error) {
 	if opts.DetectFn != nil {
 		return opts.DetectFn(ctx, opts.Server)
 	}
-	return DetectTarget(ctx, opts.Server, httputils.NewDefaultClient(ctx))
+	client, err := tlsAwareClient(ctx, opts.TLS)
+	if err != nil {
+		return TargetUnknown, fmt.Errorf("TLS configuration: %w", err)
+	}
+	return DetectTarget(ctx, opts.Server, client)
+}
+
+// tlsAwareClient returns a TLS-aware *http.Client when tlsCfg is non-nil and
+// non-empty, or a default client otherwise. Used by the login flow for target
+// detection and connectivity validation against mTLS servers.
+func tlsAwareClient(ctx context.Context, tlsCfg *config.TLS) (*http.Client, error) {
+	if tlsCfg == nil || tlsCfg.IsEmpty() {
+		return httputils.NewDefaultClient(ctx), nil
+	}
+	stdTLS, err := tlsCfg.ToStdTLSConfig()
+	if err != nil {
+		return nil, err
+	}
+	return httputils.NewDefaultClientWithTLS(ctx, stdTLS), nil
 }
 
 // resolveGrafanaAuth determines how to authenticate against Grafana (step 4).
@@ -327,6 +355,7 @@ func resolveGrafanaAuth(ctx context.Context, opts Options, target Target) (strin
 
 	grafanaCfg := &config.GrafanaConfig{
 		Server: opts.Server,
+		TLS:    opts.TLS,
 	}
 
 	var method string
@@ -335,6 +364,12 @@ func resolveGrafanaAuth(ctx context.Context, opts Options, target Target) (strin
 		grafanaCfg.APIToken = opts.GrafanaToken
 		grafanaCfg.AuthMethod = "token"
 		method = "token"
+
+	case opts.TLS != nil && (len(opts.TLS.CertData) > 0 || opts.TLS.CertFile != ""):
+		// mTLS-only auth: the client certificate authenticates at the transport
+		// layer (e.g. Teleport proxy). No Grafana token or OAuth needed.
+		grafanaCfg.AuthMethod = "mtls"
+		method = "mtls"
 
 	case opts.UseOAuth:
 		if opts.NewAuthFlow == nil {
@@ -498,6 +533,11 @@ func mergeAuthIntoExisting(existing *config.Context, incoming config.Context) {
 	g.OAuthTokenExpiresAt = src.OAuthTokenExpiresAt
 	g.OAuthRefreshExpiresAt = src.OAuthRefreshExpiresAt
 	g.ProxyEndpoint = src.ProxyEndpoint
+
+	// Sync TLS settings so that re-auth with updated or cleared certs
+	// takes effect. Setting to src.TLS (which may be nil) handles both
+	// the "update certs" and "remove certs" cases.
+	g.TLS = src.TLS
 
 	// Update Cloud config if present in the incoming context.
 	if incoming.Cloud != nil {
