@@ -2,7 +2,7 @@ package grafana
 
 import (
 	"context"
-	crypto_tls "crypto/tls"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/url"
@@ -30,7 +30,7 @@ func (e *VersionIncompatibleError) Error() string {
 // callers like GetVersion can reuse it without calling ToStdTLSConfig twice.
 type clientResult struct {
 	api       *goapi.GrafanaHTTPAPI
-	tlsConfig *crypto_tls.Config // nil when no TLS is configured
+	tlsConfig *tls.Config // nil when no TLS is configured
 }
 
 func clientFromContextWithTLS(ctx *config.Context) (clientResult, error) {
@@ -55,7 +55,7 @@ func clientFromContextWithTLS(ctx *config.Context) (clientResult, error) {
 		},
 	}
 
-	var stdTLS *crypto_tls.Config
+	var stdTLS *tls.Config
 	if ctx.Grafana.TLS != nil {
 		stdTLS, err = ctx.Grafana.TLS.ToStdTLSConfig()
 		if err != nil {
@@ -81,12 +81,27 @@ func clientFromContextWithTLS(ctx *config.Context) (clientResult, error) {
 	}, nil
 }
 
+// ClientFromContext returns a goapi client configured from the given context.
+// The returned client's default transport does NOT include TLS configuration;
+// callers that need to wrap the client with middleware via WithHTTPClient
+// should use ClientFromContextWithTLS instead to avoid silently losing mTLS.
 func ClientFromContext(ctx *config.Context) (*goapi.GrafanaHTTPAPI, error) {
 	res, err := clientFromContextWithTLS(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return res.api, nil
+}
+
+// ClientFromContextWithTLS returns both the goapi client and the resolved
+// *tls.Config. Use this when wrapping the client with WithHTTPClient to
+// ensure TLS settings are preserved (see GetVersion for an example).
+func ClientFromContextWithTLS(ctx *config.Context) (*goapi.GrafanaHTTPAPI, *tls.Config, error) {
+	res, err := clientFromContextWithTLS(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	return res.api, res.tlsConfig, nil
 }
 
 // GetVersion returns the Grafana version reported by /api/health.

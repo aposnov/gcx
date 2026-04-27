@@ -133,7 +133,7 @@ type Options struct {
 // render a post-login summary and persist auth-method metadata.
 type Result struct {
 	ContextName    string
-	AuthMethod     string // "oauth", "token", or "basic"
+	AuthMethod     string // "oauth", "token", "basic", or "mtls"
 	IsCloud        bool
 	HasCloudToken  bool
 	GrafanaVersion string
@@ -313,6 +313,11 @@ func Run(ctx context.Context, opts *Options) (Result, error) {
 
 // detectTarget calls DetectFn or falls back to the real DetectTarget.
 // When TLS settings are present, builds a TLS-aware HTTP client for the probe.
+//
+// Cert-load failures (e.g. malformed cert-file path) are returned as hard
+// errors rather than degrading to TargetUnknown. This is intentional: a broken
+// TLS config should fail fast here rather than producing a confusing
+// "auth rejected" error downstream during validation.
 func detectTarget(ctx context.Context, opts Options) (Target, error) {
 	if opts.DetectFn != nil {
 		return opts.DetectFn(ctx, opts.Server)
@@ -368,6 +373,10 @@ func resolveGrafanaAuth(ctx context.Context, opts Options, target Target) (strin
 	case opts.TLS != nil && (len(opts.TLS.CertData) > 0 || opts.TLS.CertFile != ""):
 		// mTLS-only auth: the client certificate authenticates at the transport
 		// layer (e.g. Teleport proxy). No Grafana token or OAuth needed.
+		// Note: we check only for cert presence here, not cert+key pairing.
+		// TLS.ResolveFiles() enforces "both cert-file and key-file must be
+		// provided together" downstream, producing a clear error if the key
+		// is missing.
 		grafanaCfg.AuthMethod = "mtls"
 		method = "mtls"
 

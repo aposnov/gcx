@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/gcx/internal/format"
 	"github.com/grafana/gcx/internal/login"
 	cmdio "github.com/grafana/gcx/internal/output"
+	"github.com/grafana/grafana-app-sdk/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
@@ -171,6 +172,17 @@ func runLogin(cmd *cobra.Command, flags *loginOpts, args []string) error {
 	if sourceCtx != nil && sourceCtx.Grafana != nil && sourceCtx.Grafana.TLS != nil &&
 		!sourceCtx.Grafana.TLS.IsEmpty() {
 		existingTLS = sourceCtx.Grafana.TLS
+		// Advisory: when --allow-server-override re-points the context at a
+		// different server, the existing TLS client cert will be presented to
+		// the new server. This is gated by explicit user opt-in.
+		if flags.AllowServerOverride && flags.Server != "" &&
+			sourceCtx.Grafana != nil && sourceCtx.Grafana.Server != "" &&
+			flags.Server != sourceCtx.Grafana.Server {
+			logging.FromContext(cmd.Context()).Warn("reusing existing TLS client certificate for a different server",
+				"previous_server", sourceCtx.Grafana.Server,
+				"new_server", flags.Server,
+			)
+		}
 	}
 
 	opts := login.Options{
@@ -377,8 +389,10 @@ func askGrafanaAuth(opts *login.Options, existingToken string) error {
 		}
 	}
 
+	// Default to the first option in the menu. For Cloud targets, mTLS is not
+	// offered so we must not default to it even when TLS certs are present.
 	authMethod := "token"
-	if hasMTLS {
+	if hasMTLS && opts.Target != login.TargetCloud {
 		authMethod = "mtls"
 	}
 	// Single option: skip the menu and fall through directly.
@@ -516,7 +530,7 @@ func structuredMissingFieldsError(e *login.ErrNeedInput) error {
 		case "server":
 			suggestions = append(suggestions, "Pass --server <url> or set GRAFANA_SERVER")
 		case "grafana-auth":
-			suggestions = append(suggestions, "Pass --token <token> for a service account token, or configure TLS client certs for mTLS auth")
+			suggestions = append(suggestions, "Pass --token <token> for a service account token, or configure TLS client certs for mTLS auth (GRAFANA_TLS_CERT_FILE / GRAFANA_TLS_KEY_FILE env vars, or gcx config set contexts.<ctx>.grafana.tls.cert-file ...)")
 		case "cloud-token":
 			suggestions = append(suggestions, "Pass --cloud-token <token> to enable Cloud features, or --yes to skip")
 		default:
